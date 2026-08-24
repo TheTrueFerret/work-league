@@ -1,0 +1,279 @@
+/*
+ * Palette follows Schneider Electric's house style: neutral greys carrying a
+ * single confident green, rather than a coloured background. Both schemes are
+ * defined here and picked automatically from the OS setting.
+ */
+
+:root {
+	/* Schneider Electric green, plus a darkened variant that stays legible as
+	   text on light backgrounds (the brand green alone is far too bright). */
+	--green: #3dcd58;
+	--green-deep: #1d8e33;
+	--green-dark: #14672a;
+
+	--team-a: #0a6ed1;
+	--team-b: #e07000;
+	/* Text laid directly on a team colour. */
+	--team-a-on: #ffffff;
+	--team-b-on: #241200;
+
+	--r-sm: 0.5rem;
+	--r-md: 0.75rem;
+	--r-lg: 1rem;
+
+	color-scheme: light dark;
+
+	/* Light — the default. */
+	--bg: #f4f5f6;
+	--surface: #ffffff;
+	--surface-2: #eceef0;
+	--border: #d9dcdf;
+	--text: #1a1a1a;
+	--muted: #61686e;
+
+	--accent: var(--green-deep);
+	--accent-fill: var(--green);
+	--accent-on-fill: #0b2e14;
+	--accent-soft: #3dcd581f;
+
+	--win: var(--green-deep);
+	--loss: #c8102e;
+
+	--shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #16191c;
+		--surface: #1e2226;
+		--surface-2: #272c31;
+		--border: #333a40;
+		--text: #eceef0;
+		--muted: #9aa4ac;
+
+		--accent: var(--green);
+		--accent-fill: var(--green);
+		--accent-on-fill: #06210d;
+		--accent-soft: #3dcd5824;
+
+		--win: var(--green);
+		--loss: #ff6b7a;
+
+		--team-a: #4da3f0;
+		--team-b: #ffa040;
+		--team-a-on: #06192b;
+		--team-b-on: #241200;
+
+		--shadow: none;
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Inter, sans-serif;
+	font-size: 16px;
+	line-height: 1.5;
+	-webkit-text-size-adjust: 100%;
+	-webkit-tap-highlight-color: transparent;
+	overscroll-behavior-y: none;
+}
+
+h1,
+h2,
+h3 {
+	margin: 0;
+	line-height: 1.2;
+	letter-spacing: -0.02em;
+}
+
+h1 {
+	font-size: 1.6rem;
+}
+
+h2 {
+	font-size: 1.05rem;
+}
+
+a {
+	color: inherit;
+}
+
+.num {
+	font-variant-numeric: tabular-nums;
+}
+
+.muted {
+	color: var(--muted);
+}
+
+.page-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-bottom: 1.1rem;
+}
+
+.page-head p {
+	margin: 0.15rem 0 0;
+	font-size: 0.85rem;
+	color: var(--muted);
+}
+
+.card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--r-lg);
+	padding: 1rem;
+	box-shadow: var(--shadow);
+}
+
+/* --- Controls ------------------------------------------------------------ */
+
+button,
+input,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+}
+
+input[type='text'],
+input[type='password'],
+textarea {
+	width: 100%;
+	padding: 0.7rem 0.85rem;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--r-md);
+	outline: none;
+	transition: border-color 0.15s;
+}
+
+input:focus-visible,
+textarea:focus-visible {
+	border-color: var(--accent);
+}
+
+input::placeholder {
+	color: var(--muted);
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.45rem;
+	padding: 0.7rem 1.1rem;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--r-md);
+	font-weight: 600;
+	cursor: pointer;
+	text-decoration: none;
+	transition:
+		background 0.15s,
+		border-color 0.15s,
+		opacity 0.15s;
+}
+
+.btn:hover:not(:disabled) {
+	background: var(--surface-2);
+	border-color: var(--muted);
+}
+
+.btn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.btn-primary {
+	background: var(--accent-fill);
+	border-color: var(--accent-fill);
+	color: var(--accent-on-fill);
+}
+
+.btn-primary:hover:not(:disabled) {
+	background: color-mix(in oklab, var(--accent-fill) 88%, black);
+	border-color: color-mix(in oklab, var(--accent-fill) 88%, black);
+}
+
+.btn-ghost {
+	background: transparent;
+}
+
+.btn-danger {
+	color: var(--loss);
+	border-color: color-mix(in oklab, var(--loss) 35%, var(--border));
+	background: transparent;
+}
+
+.btn-danger:hover:not(:disabled) {
+	background: color-mix(in oklab, var(--loss) 12%, transparent);
+	border-color: var(--loss);
+}
+
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+/* --- Bits ---------------------------------------------------------------- */
+
+.delta {
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+.delta.up {
+	color: var(--win);
+}
+
+.delta.down {
+	color: var(--loss);
+}
+
+.pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	padding: 0.15rem 0.5rem;
+	border-radius: 999px;
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	font-size: 0.72rem;
+	font-weight: 600;
+	color: var(--muted);
+}
+
+.empty {
+	padding: 2.5rem 1rem;
+	text-align: center;
+	color: var(--muted);
+}
+
+.error {
+	margin-bottom: 1rem;
+	padding: 0.7rem 0.9rem;
+	background: color-mix(in oklab, var(--loss) 10%, var(--surface));
+	border: 1px solid color-mix(in oklab, var(--loss) 45%, transparent);
+	border-radius: var(--r-md);
+	color: var(--loss);
+	font-size: 0.9rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		transition-duration: 0.01ms !important;
+	}
+}

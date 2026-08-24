@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Pottr">
+  <defs>
+    <linearGradient id="field" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4ee06a"/>
+      <stop offset="100%" stop-color="#2ba844"/>
+    </linearGradient>
+    <radialGradient id="ball" cx="34%" cy="28%" r="78%">
+      <stop offset="0%" stop-color="#4a4a4a"/>
+      <stop offset="55%" stop-color="#161616"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#field)"/>
+  <circle cx="256" cy="262" r="150" fill="url(#ball)"/>
+  <circle cx="256" cy="262" r="62" fill="#f7f4ec"/>
+  <text x="256" y="262" font-family="Georgia, 'Times New Roman', serif" font-size="86"
+        font-weight="700" fill="#121212" text-anchor="middle" dominant-baseline="central">8</text>
+  <ellipse cx="204" cy="192" rx="42" ry="26" fill="#fff" fill-opacity=".22" transform="rotate(-32 204 192)"/>
+</svg>
