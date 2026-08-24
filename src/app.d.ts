@@ -9,10 +9,8 @@ declare global {
 		/** What Cloudflare hands each request. Absent under `vite dev` and Node. */
 		interface Platform {
 			env?: {
-				/** Connection string without the password. Not sensitive. */
+				/** Supabase connection string, set with `wrangler secret put`. */
 				DATABASE_URL?: string;
-				/** Set with `wrangler secret put DATABASE_PASSWORD`. */
-				DATABASE_PASSWORD?: string;
 			};
 			context?: {
 				waitUntil(promise: Promise<unknown>): void;

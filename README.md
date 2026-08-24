@@ -34,9 +34,7 @@ npm run dev               # http://localhost:5173
 **3. Deploy to Cloudflare.**
 
 ```sh
-# The host half — not sensitive, so it can also live in wrangler.jsonc
-npx wrangler secret put DATABASE_URL       # or set it as a plain variable
-npx wrangler secret put DATABASE_PASSWORD  # this one must be a secret
+npx wrangler secret put DATABASE_URL   # paste the same connection string
 npm run deploy
 ```
 
@@ -52,27 +50,12 @@ Then open **Players**, add everyone, and start recording matches.
 
 ### Configuration
 
-The connection string is assembled from two halves, so only one of them is a
-secret:
-
-| Variable            | Secret? | What it is                                       |
-| ------------------- | ------- | ------------------------------------------------ |
-| `DATABASE_URL`      | no      | Pooler URI **without** the password.             |
-| `DATABASE_PASSWORD` | **yes** | Your Supabase database password.                 |
-
-```
-DATABASE_URL=postgresql://postgres.<ref>@aws-0-<region>.pooler.supabase.com:6543/postgres
-DATABASE_PASSWORD=<password>
-```
-
-Set both in Cloudflare (`wrangler secret put`, or `DATABASE_URL` as a plain
-variable in `wrangler.jsonc`), in `.env` for `npm run dev` and the migration
-and seed scripts, and in `.dev.vars` for `npm run preview`.
-
-A password already embedded in `DATABASE_URL` still works — `DATABASE_PASSWORD`
-simply overrides it. Splitting them also means the password never needs
-percent-encoding: `@`, `#` and `/` are handled for you. In `.env` files, do
-quote it, because an unquoted `#` starts a comment.
+| Where              | Name           | How to set it                             |
+| ------------------ | -------------- | ----------------------------------------- |
+| Cloudflare         | `DATABASE_URL` | `npx wrangler secret put DATABASE_URL`    |
+| `npm run dev`      | `DATABASE_URL` | `.env`                                    |
+| `npm run preview`  | `DATABASE_URL` | `.dev.vars`                               |
+| migrations / seed  | `DATABASE_URL` | `.env`                                    |
 
 The Worker's name and compatibility flags live in `wrangler.jsonc`. Rename
 `pottr` there if you want a different `*.workers.dev` subdomain, or add a

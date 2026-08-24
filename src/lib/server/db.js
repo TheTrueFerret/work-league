@@ -4,7 +4,6 @@ import { alias } from 'drizzle-orm/pg-core';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { START_RATING, computeDeltas } from '../elo.js';
-import { connectionString } from './connection.js';
 import { matches, participants, players, standings } from './schema.js';
 
 /** @typedef {ReturnType<typeof postgres>} Client */
@@ -42,13 +41,12 @@ const pool = (url, max) =>
 	});
 
 /**
- * Supplies the environment from outside `process.env`, which is how Cloudflare
- * Workers deliver secrets. Safe to call on every request.
- * @param {{ DATABASE_URL?: string, DATABASE_PASSWORD?: string }} env
+ * Supplies the connection string from outside `process.env`, which is how
+ * Cloudflare Workers deliver secrets. Safe to call on every request.
+ * @param {string | undefined} url
  */
-export function useDatabaseEnv(env) {
-	const url = connectionString(env);
-	if (url !== configured) {
+export function useDatabaseUrl(url) {
+	if (url && url !== configured) {
 		configured = url;
 		// Drop any pool built against the previous URL.
 		client = undefined;
@@ -60,14 +58,16 @@ export function useDatabaseEnv(env) {
  * Gives everything `fn` does its own connection, closed once the response is
  * out. Used on Cloudflare, where a socket may not outlive its request.
  * @template T
- * @param {{ DATABASE_URL?: string, DATABASE_PASSWORD?: string }} env
+ * @param {string | undefined} url
  * @param {() => T | Promise<T>} fn
  * @param {(promise: Promise<unknown>) => void} [waitUntil] defers the close
  * @returns {Promise<T>}
  */
-export async function withConnection(env, fn, waitUntil) {
+export async function withConnection(url, fn, waitUntil) {
+	if (!url) throw new Error(missing);
+
 	/** @type {{ url: string, client?: Client, db?: ReturnType<typeof drizzle> }} */
-	const store = { url: connectionString(env) };
+	const store = { url };
 
 	try {
 		return await scope.run(store, fn);
@@ -77,6 +77,10 @@ export async function withConnection(env, fn, waitUntil) {
 		if (closing) waitUntil ? waitUntil(closing) : closing.catch(() => {});
 	}
 }
+
+const missing =
+	'DATABASE_URL is not set. On Cloudflare run `npx wrangler secret put DATABASE_URL`; ' +
+	'locally, copy .env.example to .env.';
 
 /**
  * Connects on first use rather than on import — `vite build` loads this module
@@ -93,7 +97,8 @@ function conn() {
 	}
 
 	if (!database) {
-		const url = configured ?? connectionString(globalThis.process?.env ?? {});
+		const url = configured ?? globalThis.process?.env?.DATABASE_URL;
+		if (!url) throw new Error(missing);
 		client = pool(url, 5);
 		database = drizzle(client, { schema: tables });
 	}

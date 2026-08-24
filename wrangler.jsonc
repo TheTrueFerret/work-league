@@ -7,13 +7,6 @@
 	// postgres.js needs node:net, node:tls and Buffer to reach Supabase.
 	"compatibility_flags": ["nodejs_compat"],
 
-	// The non-secret half of the connection string. Fill in your project's
-	// pooler URI, minus the password — that goes in as a secret instead:
-	//     npx wrangler secret put DATABASE_PASSWORD
-	// "vars": {
-	// 	"DATABASE_URL": "postgresql://postgres.<ref>@aws-0-<region>.pooler.supabase.com:6543/postgres"
-	// },
-
 	"assets": {
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
