@@ -14,5 +14,10 @@
 
 	"observability": {
 		"enabled": true
-	}
+	},
+
+	// Wrangler treats this file as the source of truth and deletes dashboard
+	// variables on deploy unless told otherwise. DATABASE_URL is set outside
+	// this file, so keep it.
+	"keep_vars": true
 }

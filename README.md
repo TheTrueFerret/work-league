@@ -38,6 +38,12 @@ npx wrangler secret put DATABASE_URL   # paste the same connection string
 npm run deploy
 ```
 
+Add it as a **Secret**, not a plaintext Variable — it contains your database
+password. (`keep_vars: true` in `wrangler.jsonc` stops deploys from wiping
+dashboard-set variables, but a secret is the right home for a password anyway.)
+
+Check it took with `npx wrangler secret list`.
+
 `npm run preview` runs the built Worker in Cloudflare's own runtime before you
 ship it, reading its secrets from a local `.dev.vars` file:
 
