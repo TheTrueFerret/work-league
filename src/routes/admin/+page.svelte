@@ -3,8 +3,10 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { findModule } from '$lib/modules/registry';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { buildPalette, DEFAULT_SEED, isHexColour } from '$lib/theme/palette';
-	import { extractColours, loadImage, renderIcons } from '$lib/theme/logo';
+	import { extractColours, fitCrop, loadImage, renderIcons, type Crop } from '$lib/theme/logo';
+	import LogoCropper from '$lib/components/LogoCropper.svelte';
 
 	let { data, form } = $props();
 
@@ -23,31 +25,50 @@
 
 	const validSeed = $derived(isHexColour(seed) ? seed : DEFAULT_SEED);
 	const preview = $derived(buildPalette(validSeed, []));
+	const iconBackground = $derived(buildPalette(validSeed).light['--accent-soft'] ?? '#ffffff');
 	const previewStyle = (tokens: Record<string, string>) =>
 		Object.entries(tokens)
 			.map(([k, v]) => `${k}:${v}`)
 			.join(';');
 
-	let image: HTMLImageElement | null = null;
+	/** A just-picked file, open in the cropper. Cropping happens once, right after picking. */
+	let candidate: HTMLImageElement | null = $state.raw(null);
+	/** The cropped logo waiting for "Upload logo". */
+	let image: HTMLImageElement | null = $state.raw(null);
+	let crop: Crop | null = $state.raw(null);
 
 	async function chooseLogo(event: Event) {
-		const file = (event.currentTarget as HTMLInputElement).files?.[0];
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		// Let the same file be picked again after cancelling.
+		input.value = '';
 		logoError = null;
 		if (!file) return;
 		try {
-			image = await loadImage(file);
-			logoColours = extractColours(image);
-			logoIcons = renderIcons(image, buildPalette(validSeed).light['--accent-soft'] ?? '#ffffff');
+			candidate = await loadImage(file);
 		} catch (err) {
 			logoError = err instanceof Error ? err.message : 'That image could not be read';
 		}
 	}
 
+	function applyCrop(next: Crop) {
+		if (!candidate) return;
+		image = candidate;
+		crop = next;
+		candidate = null;
+		logoColours = extractColours(image, next);
+		logoIcons = renderIcons(image, iconBackground, next);
+	}
+
+	function discardLogo() {
+		image = crop = logoIcons = null;
+		logoColours = [];
+	}
+
 	function useColour(colour: string) {
 		seed = colour;
 		// Re-render the icon backgrounds in the new colour.
-		if (image)
-			logoIcons = renderIcons(image, buildPalette(colour).light['--accent-soft'] ?? '#ffffff');
+		if (image && crop) logoIcons = renderIcons(image, iconBackground, crop);
 	}
 
 	const saved = $derived(form && 'saved' in form ? form.saved : null);
@@ -56,6 +77,19 @@
 		async ({ update }: { update: () => Promise<void> }) => {
 			await update();
 			await invalidateAll();
+		};
+
+	// Keep what was typed on screen after saving; SvelteKit would otherwise reset the form,
+	// and these inputs have no default value to reset to, so they'd go blank.
+	const saveBranding: SubmitFunction =
+		() =>
+		async ({ update, result }) => {
+			await update({ reset: false });
+			if (result.type === 'success') {
+				await invalidateAll();
+				// Show what the server stored (trimmed, lower-case colour).
+				({ name, tagline, seed } = data.settings.branding);
+			}
 		};
 </script>
 
@@ -89,14 +123,6 @@
 			{/if}
 		</div>
 		<div class="logo-actions">
-			<label class="btn btn-tonal file">
-				Choose logo…
-				<input
-					type="file"
-					accept="image/png,image/jpeg,image/webp,image/svg+xml"
-					onchange={chooseLogo}
-				/>
-			</label>
 			{#if logoIcons}
 				<form
 					method="POST"
@@ -105,7 +131,7 @@
 						async ({ update, result }) => {
 							await update();
 							if (result.type === 'success') {
-								logoIcons = null;
+								discardLogo();
 								await invalidateAll();
 							}
 						}}
@@ -117,20 +143,48 @@
 						/>{/each}
 					<button class="btn btn-primary">Upload logo</button>
 				</form>
-			{:else if data.settings.branding.logoVersion}
-				<form method="POST" action="?/removeLogo" use:enhance={refresh}>
-					<button class="btn btn-ghost">Remove logo</button>
-				</form>
+				<label class="btn btn-ghost file">
+					Other image…
+					<input
+						type="file"
+						accept="image/png,image/jpeg,image/webp,image/svg+xml"
+						onchange={chooseLogo}
+					/>
+				</label>
+				<button type="button" class="btn btn-ghost" onclick={discardLogo}>Discard</button>
+			{:else}
+				<label class="btn btn-tonal file">
+					Choose logo…
+					<input
+						type="file"
+						accept="image/png,image/jpeg,image/webp,image/svg+xml"
+						onchange={chooseLogo}
+					/>
+				</label>
+				{#if data.settings.branding.logoVersion}
+					<form method="POST" action="?/removeLogo" use:enhance={refresh}>
+						<button class="btn btn-ghost">Remove logo</button>
+					</form>
+				{/if}
 			{/if}
-			<span class="muted small">Square works best. PNG, JPG, WebP or SVG.</span>
+			<span class="muted small">PNG, JPG, WebP or SVG. You can crop it before it's saved.</span>
 		</div>
 	</div>
 	{#if logoError}<p class="error">{logoError}</p>{/if}
+	{#if candidate}
+		<LogoCropper
+			image={candidate}
+			crop={fitCrop(candidate)}
+			{iconBackground}
+			onapply={applyCrop}
+			oncancel={() => (candidate = null)}
+		/>
+	{/if}
 	{#if saved === 'logo'}<p class="notice">
 			Logo saved. Installed apps pick up the new icon when they next update.
 		</p>{/if}
 
-	<form method="POST" action="?/branding" class="fields" use:enhance={refresh}>
+	<form method="POST" action="?/branding" class="fields" use:enhance={saveBranding}>
 		<label>
 			<span>League name</span>
 			<input type="text" name="name" bind:value={name} maxlength="40" required />
@@ -309,7 +363,7 @@
 	.logo-row {
 		display: flex;
 		gap: 1rem;
-		align-items: center;
+		align-items: flex-start;
 	}
 
 	.logo-box {
@@ -522,6 +576,11 @@
 	}
 
 	@media (max-width: 30rem) {
+		.logo-actions .btn {
+			padding: 0.55rem 0.9rem;
+			font-size: 0.9rem;
+		}
+
 		.previews {
 			grid-template-columns: 1fr;
 		}

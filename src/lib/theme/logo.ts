@@ -6,14 +6,59 @@ import { hexFromArgb, QuantizerCelebi, Score } from '@material/material-color-ut
  * on Cloudflare Workers anyway).
  */
 
-export function loadImage(file: File): Promise<HTMLImageElement> {
+export function loadImage(source: File | string): Promise<HTMLImageElement> {
 	return new Promise((resolve, reject) => {
-		const url = URL.createObjectURL(file);
+		const url = typeof source === 'string' ? source : URL.createObjectURL(source);
 		const image = new Image();
 		image.onload = () => resolve(image);
 		image.onerror = () => reject(new Error('That file is not an image this browser can read'));
 		image.src = url;
 	});
+}
+
+/** The image's size in pixels. SVGs without a width or height report 0, so they get a stand-in. */
+export function imageSize(image: HTMLImageElement): { width: number; height: number } {
+	const width = image.naturalWidth || image.width;
+	const height = image.naturalHeight || image.height;
+	return width && height ? { width, height } : { width: 512, height: 512 };
+}
+
+/**
+ * The square of the image that becomes the logo, in the image's own pixels.
+ * It may reach past the image's edges: that part stays transparent.
+ */
+export interface Crop {
+	/** Centre of the square. */
+	readonly x: number;
+	readonly y: number;
+	/** Side length. */
+	readonly size: number;
+}
+
+/** The whole image, centred: what you get without cropping. */
+export function fitCrop(image: HTMLImageElement): Crop {
+	const { width, height } = imageSize(image);
+	return { x: width / 2, y: height / 2, size: Math.max(width, height) };
+}
+
+/** Draws the cropped square of `image` into a `box`-pixel square at (`left`, `top`). */
+function drawCropped(
+	ctx: CanvasRenderingContext2D,
+	image: HTMLImageElement,
+	crop: Crop,
+	left: number,
+	top: number,
+	box: number
+) {
+	const { width, height } = imageSize(image);
+	const k = box / crop.size;
+	ctx.drawImage(
+		image,
+		left + (crop.size / 2 - crop.x) * k,
+		top + (crop.size / 2 - crop.y) * k,
+		width * k,
+		height * k
+	);
 }
 
 interface IconSpec {
@@ -24,7 +69,7 @@ interface IconSpec {
 	readonly background?: string;
 }
 
-function render(image: HTMLImageElement, spec: IconSpec): string {
+function render(image: HTMLImageElement, crop: Crop, spec: IconSpec): string {
 	const canvas = document.createElement('canvas');
 	canvas.width = canvas.height = spec.size;
 	const ctx = canvas.getContext('2d');
@@ -34,34 +79,51 @@ function render(image: HTMLImageElement, spec: IconSpec): string {
 		ctx.fillRect(0, 0, spec.size, spec.size);
 	}
 	const box = spec.size * spec.scale;
-	const ratio = Math.min(box / image.naturalWidth, box / image.naturalHeight);
-	const w = image.naturalWidth * ratio;
-	const h = image.naturalHeight * ratio;
+	const margin = (spec.size - box) / 2;
+	// Anything outside the logo's square is clipped, so a crop can't spill into the margin.
+	ctx.beginPath();
+	ctx.rect(margin, margin, box, box);
+	ctx.clip();
 	ctx.imageSmoothingQuality = 'high';
-	ctx.drawImage(image, (spec.size - w) / 2, (spec.size - h) / 2, w, h);
+	drawCropped(ctx, image, crop, margin, margin, box);
 	return canvas.toDataURL('image/png');
 }
 
 /** Every icon the app needs, as PNG data URLs keyed by their published file name. */
-export function renderIcons(image: HTMLImageElement, background: string): Record<string, string> {
+export function renderIcons(
+	image: HTMLImageElement,
+	background: string,
+	crop: Crop = fitCrop(image)
+): Record<string, string> {
 	return {
-		'logo.png': render(image, { size: 256, scale: 1 }),
-		'icon-192.png': render(image, { size: 192, scale: 1 }),
-		'icon-512.png': render(image, { size: 512, scale: 1 }),
+		'logo.png': render(image, crop, { size: 256, scale: 1 }),
+		'icon-192.png': render(image, crop, { size: 192, scale: 1 }),
+		'icon-512.png': render(image, crop, { size: 512, scale: 1 }),
 		// Android crops maskable icons to a circle; keep the logo inside the safe zone.
-		'icon-maskable-512.png': render(image, { size: 512, scale: 0.62, background }),
-		'apple-touch-icon.png': render(image, { size: 180, scale: 0.78, background })
+		'icon-maskable-512.png': render(image, crop, {
+			size: 512,
+			scale: MASKABLE_SAFE_ZONE,
+			background
+		}),
+		'apple-touch-icon.png': render(image, crop, { size: 180, scale: 0.78, background })
 	};
 }
 
+/** How much of a maskable icon the logo fills, so a circular mask never cuts it. */
+export const MASKABLE_SAFE_ZONE = 0.62;
+
 /** The logo's most usable brand colours, best first — the same picker Android uses for wallpapers. */
-export function extractColours(image: HTMLImageElement, count = 4): string[] {
+export function extractColours(
+	image: HTMLImageElement,
+	crop: Crop = fitCrop(image),
+	count = 4
+): string[] {
 	const canvas = document.createElement('canvas');
 	const size = 128;
 	canvas.width = canvas.height = size;
 	const ctx = canvas.getContext('2d', { willReadFrequently: true });
 	if (!ctx) return [];
-	ctx.drawImage(image, 0, 0, size, size);
+	drawCropped(ctx, image, crop, 0, 0, size);
 	const { data } = ctx.getImageData(0, 0, size, size);
 
 	const pixels: number[] = [];

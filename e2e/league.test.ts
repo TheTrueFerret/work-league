@@ -71,3 +71,49 @@ test('the passphrase keeps outsiders out and the admin in', async ({ page, conte
 	await page.getByRole('button', { name: 'Remove passphrase' }).click();
 	await expect(page.getByText('The league is open')).toBeVisible();
 });
+
+test('branding keeps what was typed, and a logo can be cropped before upload', async ({ page }) => {
+	await page.goto('/admin/login?next=/admin');
+	await page.getByLabel('Admin password').fill('e2e-admin-password');
+	await page.getByRole('button', { name: 'Sign in' }).click();
+	await expect(page.getByRole('heading', { name: 'Admin', exact: true })).toBeVisible();
+	await page.waitForLoadState('networkidle');
+
+	// Saving used to reset the form and blank every field.
+	await page.getByLabel('League name').fill('Crop League');
+	await page.getByLabel('Brand colour hex').fill('#E05A2B');
+	await page.getByRole('button', { name: 'Save branding' }).click();
+	await expect(page.getByText('Branding saved.')).toBeVisible();
+	await expect(page.getByLabel('League name')).toHaveValue('Crop League');
+	await expect(page.getByLabel('Brand colour hex')).toHaveValue('#e05a2b');
+
+	// A wide logo with its mark off to one side: zoom in before uploading.
+	await page.locator('input[type=file][accept^="image"]').setInputFiles({
+		name: 'logo.svg',
+		mimeType: 'image/svg+xml',
+		buffer: Buffer.from(
+			'<svg xmlns="http://www.w3.org/2000/svg" width="300" height="100"><circle cx="220" cy="50" r="40" fill="#e05a2b"/></svg>'
+		)
+	});
+	const cropper = page.getByRole('dialog', { name: 'Position your logo' });
+	await expect(cropper).toBeVisible();
+	await cropper.getByRole('button', { name: 'Zoom in' }).click();
+	await expect(cropper.getByRole('slider', { name: 'Zoom' })).toHaveAttribute(
+		'aria-valuetext',
+		'125%'
+	);
+	await cropper.getByRole('button', { name: 'Use this' }).click();
+	await expect(cropper).toBeHidden();
+	await expect(page.getByAltText('New logo preview')).toBeVisible();
+	await page.getByRole('button', { name: 'Upload logo' }).click();
+	await expect(page.getByText('Logo saved.')).toBeVisible();
+	await expect(page.getByLabel('League name')).toHaveValue('Crop League');
+
+	// Put the defaults back for the other tests.
+	await page.getByRole('button', { name: 'Remove logo' }).click();
+	await expect(page.getByAltText('Current logo')).toBeHidden();
+	await page.getByLabel('League name').fill('Work League');
+	await page.getByLabel('Brand colour hex').fill('#3dcd58');
+	await page.getByRole('button', { name: 'Save branding' }).click();
+	await expect(page.getByText('Branding saved.')).toBeVisible();
+});
