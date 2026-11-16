@@ -40,7 +40,15 @@
 			}}
 	>
 		<label class="sr-only" for="new-player">Name</label>
-		<input id="new-player" type="text" name="name" bind:value={name} placeholder="Add a person" maxlength="40" required />
+		<input
+			id="new-player"
+			type="text"
+			name="name"
+			bind:value={name}
+			placeholder="Add a person"
+			maxlength="40"
+			required
+		/>
 		<button class="btn btn-primary" disabled={!name.trim()}>Add</button>
 	</form>
 {/if}
@@ -64,9 +72,19 @@
 						>
 							<input type="hidden" name="id" value={p.id} />
 							<!-- svelte-ignore a11y_autofocus -->
-							<input type="text" name="name" value={p.name} maxlength="40" required autofocus aria-label="New name" />
+							<input
+								type="text"
+								name="name"
+								value={p.name}
+								maxlength="40"
+								required
+								autofocus
+								aria-label="New name"
+							/>
 							<button class="btn btn-primary">Save</button>
-							<button type="button" class="btn btn-ghost" onclick={() => (editing = null)}>Cancel</button>
+							<button type="button" class="btn btn-ghost" onclick={() => (editing = null)}
+								>Cancel</button
+							>
 						</form>
 					{:else}
 						<a class="who" href="/players/{p.id}">
@@ -79,7 +97,9 @@
 
 						{#if shell().admin}
 							<div class="actions">
-								<button type="button" class="btn btn-ghost sm" onclick={() => (editing = p.id)}>Rename</button>
+								<button type="button" class="btn btn-ghost sm" onclick={() => (editing = p.id)}
+									>Rename</button
+								>
 								<form method="POST" action="?/archive" use:enhance>
 									<input type="hidden" name="id" value={p.id} />
 									<input type="hidden" name="active" value={p.active ? '0' : '1'} />
@@ -88,7 +108,9 @@
 								{#if p.games === 0}
 									<form method="POST" action="?/delete" use:enhance>
 										<input type="hidden" name="id" value={p.id} />
-										<button class="btn btn-ghost sm danger" aria-label="Delete {p.name}">Delete</button>
+										<button class="btn btn-ghost sm danger" aria-label="Delete {p.name}"
+											>Delete</button
+										>
 									</form>
 								{/if}
 							</div>

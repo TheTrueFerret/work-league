@@ -1,5 +1,12 @@
 import * as v from 'valibot';
-import { attempt, formId, formText, readForm, requireAdmin, requireMember } from '$lib/server/forms';
+import {
+	attempt,
+	formId,
+	formText,
+	readForm,
+	requireAdmin,
+	requireMember
+} from '$lib/server/forms';
 import {
 	addPlayer,
 	deletePlayer,
@@ -38,7 +45,10 @@ export const actions: Actions = {
 	archive: async ({ locals, request }) => {
 		requireAdmin(locals);
 		return attempt(async () => {
-			const form = await readForm(request, v.object({ id: formId, active: v.picklist(['0', '1']) }));
+			const form = await readForm(
+				request,
+				v.object({ id: formId, active: v.picklist(['0', '1']) })
+			);
 			await setPlayerActive(form.id, form.active === '1');
 			return { archived: true };
 		});

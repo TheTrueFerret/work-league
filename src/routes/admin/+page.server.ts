@@ -39,7 +39,8 @@ function decodePng(dataUrl: string): Uint8Array {
 	const binary = atob(dataUrl.slice(prefix.length));
 	const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
 	if (bytes.length > MAX_ASSET_BYTES) throw new UserError('That logo is too large');
-	if (!PNG_SIGNATURE.every((b, i) => bytes[i] === b)) throw new UserError('That is not a PNG image');
+	if (!PNG_SIGNATURE.every((b, i) => bytes[i] === b))
+		throw new UserError('That is not a PNG image');
 	return bytes;
 }
 
@@ -56,12 +57,25 @@ export const actions: Actions = {
 		const form = await readForm(
 			request,
 			v.object({
-				name: v.pipe(v.string(), v.trim(), v.minLength(1, 'Give the league a name'), v.maxLength(40, 'Keep the name under 40 characters')),
-				tagline: v.pipe(v.string(), v.trim(), v.maxLength(80, 'Keep the tagline under 80 characters')),
+				name: v.pipe(
+					v.string(),
+					v.trim(),
+					v.minLength(1, 'Give the league a name'),
+					v.maxLength(40, 'Keep the name under 40 characters')
+				),
+				tagline: v.pipe(
+					v.string(),
+					v.trim(),
+					v.maxLength(80, 'Keep the tagline under 80 characters')
+				),
 				seed: v.pipe(v.string(), v.trim(), v.check(isHexColour, 'Pick a colour like #3dcd58'))
 			})
 		);
-		await saveSetting('branding', { ...locals.settings.branding, ...form, seed: form.seed.toLowerCase() });
+		await saveSetting('branding', {
+			...locals.settings.branding,
+			...form,
+			seed: form.seed.toLowerCase()
+		});
 		return { saved: 'branding' };
 	}),
 
@@ -70,7 +84,8 @@ export const actions: Actions = {
 		const assets = new Map<BrandAssetKey, Uint8Array>();
 		for (const key of Object.keys(BRAND_ASSETS)) {
 			const value = form.get(key);
-			if (typeof value !== 'string' || !isBrandAssetKey(key)) throw new UserError('The logo upload was incomplete');
+			if (typeof value !== 'string' || !isBrandAssetKey(key))
+				throw new UserError('The logo upload was incomplete');
 			assets.set(key, decodePng(value));
 		}
 		await saveBrandAssets(assets);
@@ -96,7 +111,9 @@ export const actions: Actions = {
 	passphrase: adminAction(async ({ request, locals }) => {
 		const { passphrase } = await readForm(
 			request,
-			v.object({ passphrase: v.pipe(v.string(), v.trim(), v.minLength(6, 'Use at least 6 characters')) })
+			v.object({
+				passphrase: v.pipe(v.string(), v.trim(), v.minLength(6, 'Use at least 6 characters'))
+			})
 		);
 		const { access } = locals.settings;
 		await saveSetting('access', {
@@ -110,7 +127,11 @@ export const actions: Actions = {
 
 	removePassphrase: adminAction(async ({ locals }) => {
 		const { access } = locals.settings;
-		await saveSetting('access', { ...access, passphraseHash: null, passphraseVersion: access.passphraseVersion + 1 });
+		await saveSetting('access', {
+			...access,
+			passphraseHash: null,
+			passphraseVersion: access.passphraseVersion + 1
+		});
 		return { saved: 'passphrase' };
 	}),
 

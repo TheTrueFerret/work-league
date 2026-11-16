@@ -20,7 +20,8 @@
 	<div>
 		<h1>History</h1>
 		<p>
-			{#if shell().admin}Deleting a match replays every rating after it.{:else}The latest {game.name.toLowerCase()} results.{/if}
+			{#if shell().admin}Deleting a match replays every rating after it.{:else}The latest {game.name.toLowerCase()}
+				results.{/if}
 		</p>
 	</div>
 </header>
@@ -52,14 +53,24 @@
 
 				<div class="sides" class:many={m.sides.length > 2}>
 					{#each m.sides as side (side.side)}
-						<div class="side" class:won={side.placement === 1} style:--side="var(--side-{side.side % 8})">
+						<div
+							class="side"
+							class:won={side.placement === 1}
+							style:--side="var(--side-{side.side % 8})"
+						>
 							{#each side.players as p (p.playerId)}
 								<a class="line" href="/players/{p.playerId}?game={game.id}">
 									<span class="pname">{p.name}</span>
 									<span class="delta {p.delta >= 0 ? 'up' : 'down'}">{signed(p.delta)}</span>
 								</a>
 							{/each}
-							<span class="tag">{side.placement === 1 ? 'won' : m.sides.length > 2 ? ordinal(side.placement) : ''}</span>
+							<span class="tag"
+								>{side.placement === 1
+									? 'won'
+									: m.sides.length > 2
+										? ordinal(side.placement)
+										: ''}</span
+							>
 						</div>
 					{/each}
 				</div>
@@ -77,7 +88,9 @@
 						<input type="hidden" name="id" value={m.id} />
 						<p>Delete this match and recalculate every rating since?</p>
 						<div class="confirm-actions">
-							<button type="button" class="btn btn-ghost" onclick={() => (confirming = null)}>Cancel</button>
+							<button type="button" class="btn btn-ghost" onclick={() => (confirming = null)}
+								>Cancel</button
+							>
 							<button class="btn btn-danger">Delete</button>
 						</div>
 					</form>

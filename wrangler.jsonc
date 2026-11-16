@@ -4,7 +4,7 @@
 	"main": ".svelte-kit/cloudflare/_worker.js",
 	"compatibility_date": "2026-08-20",
 
-	// postgres.js needs node:net, node:tls and Buffer to reach Supabase.
+	// postgres.js needs node:net, node:tls and Buffer to reach the database.
 	"compatibility_flags": ["nodejs_compat"],
 
 	"assets": {
@@ -16,8 +16,9 @@
 		"enabled": true
 	},
 
-	// Wrangler treats this file as the source of truth and deletes dashboard
-	// variables on deploy unless told otherwise. DATABASE_URL is set outside
-	// this file, so keep it.
+	// Secrets are set outside this file:
+	//   npx wrangler secret put DATABASE_URL     (a postgres:// URL; PGlite cannot run on Workers)
+	//   npx wrangler secret put ADMIN_PASSWORD
+	// Wrangler deletes dashboard variables on deploy unless told to keep them.
 	"keep_vars": true
 }

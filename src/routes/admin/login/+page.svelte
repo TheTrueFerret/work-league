@@ -30,7 +30,14 @@
 		>
 			<label class="sr-only" for="password">Admin password</label>
 			<!-- svelte-ignore a11y_autofocus -->
-			<input id="password" type="password" name="password" autocomplete="current-password" required autofocus />
+			<input
+				id="password"
+				type="password"
+				name="password"
+				autocomplete="current-password"
+				required
+				autofocus
+			/>
 			<button class="btn btn-primary" disabled={busy}>Sign in</button>
 		</form>
 	{/if}

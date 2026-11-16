@@ -50,20 +50,24 @@
 
 	/** What each player gains if their side wins and loses if it comes last. */
 	const preview = $derived.by(() => {
-		const out = new Map<number, { win: number; lose: number }>();
-		if (!ready) return out;
-		resolved.forEach((side, i) => {
+		if (!ready) return new Map<number, { win: number; lose: number }>();
+		const entries = resolved.flatMap((side, i) => {
 			const winPlacings = resolved.map((_, j) => (j === i ? 1 : 2));
 			const losePlacings = resolved.map((_, j) => (j === i ? resolved.length : 1));
 			const ifWin = computeDeltas(resolved, winPlacings, rating);
 			const ifLose = computeDeltas(resolved, losePlacings, rating);
-			for (const p of side) out.set(p.id, { win: ifWin.get(p.id) ?? 0, lose: ifLose.get(p.id) ?? 0 });
+			return side.map(
+				(p) => [p.id, { win: ifWin.get(p.id) ?? 0, lose: ifLose.get(p.id) ?? 0 }] as const
+			);
 		});
-		return out;
+		return new Map(entries);
 	});
 
 	const labelFor = (i: number): string =>
-		labels?.[i] ?? (mode === 'solo' ? (resolved[i]?.[0]?.name ?? `Player ${i + 1}`) : `Team ${String.fromCharCode(65 + i)}`);
+		labels?.[i] ??
+		(mode === 'solo'
+			? (resolved[i]?.[0]?.name ?? `Player ${i + 1}`)
+			: `Team ${String.fromCharCode(65 + i)}`);
 
 	const average = (side: readonly RosterPlayer[]): number =>
 		side.length ? Math.round(side.reduce((n, p) => n + p.rating, 0) / side.length) : 0;
@@ -108,14 +112,21 @@
 				<header>
 					<h3>{labelFor(i)}</h3>
 					<span class="num muted">
-						{#if ready && chances[i] !== undefined}{Math.round(chances[i] * 100)}%{:else if side.length && mode === 'teams'}avg {average(side)}{/if}
+						{#if ready && chances[i] !== undefined}{Math.round(
+								chances[i] * 100
+							)}%{:else if side.length && mode === 'teams'}avg {average(side)}{/if}
 					</span>
 				</header>
 				{#if side.length}
 					<ul>
 						{#each side as p (p.id)}
 							<li>
-								<button type="button" class="member" onclick={() => tap(p.id)} title={mode === 'solo' ? 'Remove' : 'Move to the next side'}>
+								<button
+									type="button"
+									class="member"
+									onclick={() => tap(p.id)}
+									title={mode === 'solo' ? 'Remove' : 'Move to the next side'}
+								>
 									<span class="name">{p.name}</span>
 									<span class="num rating">{p.rating}</span>
 									{#if preview.has(p.id)}
@@ -143,7 +154,11 @@
 	</div>
 
 	{#if ready && resolved.length === 2}
-		<div class="odds-bar" role="img" aria-label="{labelFor(0)} win chance {Math.round((chances[0] ?? 0.5) * 100)} percent">
+		<div
+			class="odds-bar"
+			role="img"
+			aria-label="{labelFor(0)} win chance {Math.round((chances[0] ?? 0.5) * 100)} percent"
+		>
 			<div class="fill" style:width="{(chances[0] ?? 0.5) * 100}%"></div>
 			<span class="num">{Math.round((chances[0] ?? 0.5) * 100)}%</span>
 			<span class="num right">{100 - Math.round((chances[0] ?? 0.5) * 100)}%</span>
@@ -152,17 +167,28 @@
 
 	<div class="tools">
 		{#if mode === 'teams' && sideCount === 2}
-			<button type="button" class="btn btn-ghost" onclick={balance} disabled={taken.size < 2}>Balance teams</button>
-			<button type="button" class="btn btn-ghost" onclick={swap} disabled={!ready}>Swap sides</button>
+			<button type="button" class="btn btn-ghost" onclick={balance} disabled={taken.size < 2}
+				>Balance teams</button
+			>
+			<button type="button" class="btn btn-ghost" onclick={swap} disabled={!ready}
+				>Swap sides</button
+			>
 		{/if}
-		<button type="button" class="btn btn-ghost" onclick={clear} disabled={taken.size === 0}>Clear</button>
+		<button type="button" class="btn btn-ghost" onclick={clear} disabled={taken.size === 0}
+			>Clear</button
+		>
 	</div>
 
 	{#if bench.length}
 		<h3 class="section-label">Available</h3>
 		<div class="bench">
 			{#each bench as p (p.id)}
-				<button type="button" class="chip" onclick={() => tap(p.id)} disabled={mode === 'solo' && sides.length >= maxSides}>
+				<button
+					type="button"
+					class="chip"
+					onclick={() => tap(p.id)}
+					disabled={mode === 'solo' && sides.length >= maxSides}
+				>
 					{p.name}<span class="num muted">{p.rating}</span>
 				</button>
 			{/each}

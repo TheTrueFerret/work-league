@@ -59,7 +59,8 @@
 {#if !shell().member}
 	<div class="card empty">
 		<p>Enter the office passphrase to record results.</p>
-		<a class="btn btn-primary" href="/unlock?next={encodeURIComponent(page.url.pathname)}">Unlock</a>
+		<a class="btn btn-primary" href="/unlock?next={encodeURIComponent(page.url.pathname)}">Unlock</a
+		>
 	</div>
 {:else}
 	{#await screen}

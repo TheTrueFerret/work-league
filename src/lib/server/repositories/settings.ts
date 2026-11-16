@@ -15,7 +15,10 @@ const hexColour = v.pipe(v.string(), v.check(isHexColour, 'Pick a colour like #3
 
 const BrandingSchema = v.object({
 	name: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(40)), 'Work League'),
-	tagline: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(80)), 'Friendly competition at work.'),
+	tagline: v.optional(
+		v.pipe(v.string(), v.trim(), v.maxLength(80)),
+		'Friendly competition at work.'
+	),
 	seed: v.optional(hexColour, DEFAULT_SEED),
 	/** Bumped on every logo upload so browsers fetch the new one. Null means no logo. */
 	logoVersion: v.optional(v.nullable(v.number()), null)
@@ -121,7 +124,10 @@ export async function sessionSecret(fromEnv: string | undefined): Promise<string
 	const bytes = crypto.getRandomValues(new Uint8Array(32));
 	const generated = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 	// If two requests race, the first insert wins and both read it back.
-	await db.insert(settings).values({ key: 'secret', value: { value: generated } }).onConflictDoNothing();
+	await db
+		.insert(settings)
+		.values({ key: 'secret', value: { value: generated } })
+		.onConflictDoNothing();
 	const [stored] = await db.select().from(settings).where(eq(settings.key, 'secret'));
 	return v.parse(SecretSchema, stored?.value).value;
 }

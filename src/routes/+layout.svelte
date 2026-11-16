@@ -75,9 +75,16 @@
 	</main>
 
 	{#if !bare}
-		<nav aria-label={game ? `${game.name} navigation` : 'Main navigation'} style:--tabs={tabs.length}>
+		<nav
+			aria-label={game ? `${game.name} navigation` : 'Main navigation'}
+			style:--tabs={tabs.length}
+		>
 			{#each tabs as tab (tab.href)}
-				<a href={tab.href} class:active={isActive(tab)} aria-current={isActive(tab) ? 'page' : undefined}>
+				<a
+					href={tab.href}
+					class:active={isActive(tab)}
+					aria-current={isActive(tab) ? 'page' : undefined}
+				>
 					<Icon name={tab.icon} />
 					<span>{tab.label}</span>
 				</a>

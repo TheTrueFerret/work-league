@@ -24,7 +24,14 @@
 	>
 		<label class="sr-only" for="passphrase">Passphrase</label>
 		<!-- svelte-ignore a11y_autofocus -->
-		<input id="passphrase" type="password" name="passphrase" autocomplete="current-password" required autofocus />
+		<input
+			id="passphrase"
+			type="password"
+			name="passphrase"
+			autocomplete="current-password"
+			required
+			autofocus
+		/>
 		<button class="btn btn-primary" disabled={busy}>Unlock</button>
 	</form>
 	{#if data.publicRead}

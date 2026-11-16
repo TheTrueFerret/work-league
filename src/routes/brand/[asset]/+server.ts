@@ -1,5 +1,9 @@
 import { error, redirect } from '@sveltejs/kit';
-import { BRAND_ASSETS, getBrandAsset, isBrandAssetKey } from '$lib/server/repositories/brand-assets';
+import {
+	BRAND_ASSETS,
+	getBrandAsset,
+	isBrandAssetKey
+} from '$lib/server/repositories/brand-assets';
 import type { RequestHandler } from './$types';
 
 /** The uploaded logo and icons, or the built-in Work League ones when none is set. */

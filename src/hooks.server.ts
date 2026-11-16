@@ -1,12 +1,7 @@
 import { redirect, type Handle, type HandleServerError } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { installedModules } from '$lib/modules/registry';
-import {
-	ADMIN_COOKIE,
-	isValidAdmin,
-	isValidMember,
-	MEMBER_COOKIE
-} from '$lib/server/auth/session';
+import { ADMIN_COOKIE, isValidAdmin, isValidMember, MEMBER_COOKIE } from '$lib/server/auth/session';
 import {
 	configureDatabase,
 	DatabaseNotConfiguredError,
@@ -80,8 +75,7 @@ const access: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-const escapeHtml = (text: string) =>
-	text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** Writes the brand colours and name into the HTML so the first paint is already themed. */
 const theme: Handle = ({ event, resolve }) => {

@@ -1,0 +1,9 @@
+package-lock.json
+.svelte-kit/
+build/
+.wrangler/
+.data/
+drizzle/
+static/
+test-results/
+playwright-report/

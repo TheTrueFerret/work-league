@@ -1,7 +1,12 @@
 import { redirect } from '@sveltejs/kit';
 import * as v from 'valibot';
 import { cookieOptions, guardedCheck, safeNext } from '$lib/server/auth/sign-in';
-import { ADMIN_COOKIE, ADMIN_MAX_AGE, matchesAdminPassword, signToken } from '$lib/server/auth/session';
+import {
+	ADMIN_COOKIE,
+	ADMIN_MAX_AGE,
+	matchesAdminPassword,
+	signToken
+} from '$lib/server/auth/session';
 import { attempt, readForm } from '$lib/server/forms';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -19,7 +24,11 @@ export const actions: Actions = {
 			await guardedCheck(event, 'admin', async () =>
 				configured ? matchesAdminPassword(locals.secret, password, configured) : false
 			);
-			const token = await signToken(locals.secret, { kind: 'admin', version: 0, issuedAt: Date.now() });
+			const token = await signToken(locals.secret, {
+				kind: 'admin',
+				version: 0,
+				issuedAt: Date.now()
+			});
 			event.cookies.set(ADMIN_COOKIE, token, cookieOptions(event, ADMIN_MAX_AGE));
 			return true;
 		});

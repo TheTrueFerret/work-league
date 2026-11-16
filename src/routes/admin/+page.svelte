@@ -46,14 +46,17 @@
 	function useColour(colour: string) {
 		seed = colour;
 		// Re-render the icon backgrounds in the new colour.
-		if (image) logoIcons = renderIcons(image, buildPalette(colour).light['--accent-soft'] ?? '#ffffff');
+		if (image)
+			logoIcons = renderIcons(image, buildPalette(colour).light['--accent-soft'] ?? '#ffffff');
 	}
 
 	const saved = $derived(form && 'saved' in form ? form.saved : null);
-	const refresh = () => async ({ update }: { update: () => Promise<void> }) => {
-		await update();
-		await invalidateAll();
-	};
+	const refresh =
+		() =>
+		async ({ update }: { update: () => Promise<void> }) => {
+			await update();
+			await invalidateAll();
+		};
 </script>
 
 <svelte:head><title>Admin · {shell().branding.name}</title></svelte:head>
@@ -71,7 +74,9 @@
 <!-- Branding ------------------------------------------------------------- -->
 <section class="card block" aria-labelledby="brand-heading">
 	<h2 id="brand-heading">Branding</h2>
-	<p class="muted">Your name, logo and one colour. The whole app builds its colours from it, light and dark.</p>
+	<p class="muted">
+		Your name, logo and one colour. The whole app builds its colours from it, light and dark.
+	</p>
 
 	<div class="logo-row">
 		<div class="logo-box">
@@ -86,14 +91,30 @@
 		<div class="logo-actions">
 			<label class="btn btn-tonal file">
 				Choose logo…
-				<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange={chooseLogo} />
+				<input
+					type="file"
+					accept="image/png,image/jpeg,image/webp,image/svg+xml"
+					onchange={chooseLogo}
+				/>
 			</label>
 			{#if logoIcons}
-				<form method="POST" action="?/logo" use:enhance={() => async ({ update, result }) => {
-					await update();
-					if (result.type === 'success') { logoIcons = null; await invalidateAll(); }
-				}}>
-					{#each Object.entries(logoIcons) as [key, url] (key)}<input type="hidden" name={key} value={url} />{/each}
+				<form
+					method="POST"
+					action="?/logo"
+					use:enhance={() =>
+						async ({ update, result }) => {
+							await update();
+							if (result.type === 'success') {
+								logoIcons = null;
+								await invalidateAll();
+							}
+						}}
+				>
+					{#each Object.entries(logoIcons) as [key, url] (key)}<input
+							type="hidden"
+							name={key}
+							value={url}
+						/>{/each}
 					<button class="btn btn-primary">Upload logo</button>
 				</form>
 			{:else if data.settings.branding.logoVersion}
@@ -105,7 +126,9 @@
 		</div>
 	</div>
 	{#if logoError}<p class="error">{logoError}</p>{/if}
-	{#if saved === 'logo'}<p class="notice">Logo saved. Installed apps pick up the new icon when they next update.</p>{/if}
+	{#if saved === 'logo'}<p class="notice">
+			Logo saved. Installed apps pick up the new icon when they next update.
+		</p>{/if}
 
 	<form method="POST" action="?/branding" class="fields" use:enhance={refresh}>
 		<label>
@@ -121,13 +144,28 @@
 			<span class="label">Brand colour</span>
 			<div class="colour-row">
 				<input type="color" bind:value={seed} aria-label="Brand colour picker" />
-				<input type="text" name="seed" bind:value={seed} maxlength="7" pattern="#[0-9a-fA-F]{'{6}'}" aria-label="Brand colour hex" class="hex" />
+				<input
+					type="text"
+					name="seed"
+					bind:value={seed}
+					maxlength="7"
+					pattern="#[0-9a-fA-F]{'{6}'}"
+					aria-label="Brand colour hex"
+					class="hex"
+				/>
 			</div>
 			{#if logoColours.length}
 				<div class="from-logo">
 					<span class="muted small">From your logo:</span>
 					{#each logoColours as colour (colour)}
-						<button type="button" class="swatch" style:background={colour} aria-label="Use {colour}" title={colour} onclick={() => useColour(colour)}></button>
+						<button
+							type="button"
+							class="swatch"
+							style:background={colour}
+							aria-label="Use {colour}"
+							title={colour}
+							onclick={() => useColour(colour)}
+						></button>
 					{/each}
 				</div>
 			{/if}
@@ -157,7 +195,9 @@
 <!-- Games ---------------------------------------------------------------- -->
 <section class="card block" aria-labelledby="games-heading">
 	<h2 id="games-heading">Games</h2>
-	<p class="muted">Switched-off games disappear from the league. Their results stay in the database.</p>
+	<p class="muted">
+		Switched-off games disappear from the league. Their results stay in the database.
+	</p>
 	<form method="POST" action="?/games" use:enhance={refresh}>
 		<ul class="toggles">
 			{#each data.installed as id (id)}
@@ -165,8 +205,16 @@
 				{#if game}
 					<li>
 						<label>
-							<input type="checkbox" name="enabled" value={id} checked={!data.settings.disabled.includes(id)} />
-							<span><strong>{game.name}</strong><span class="muted small">{game.description}</span></span>
+							<input
+								type="checkbox"
+								name="enabled"
+								value={id}
+								checked={!data.settings.disabled.includes(id)}
+							/>
+							<span
+								><strong>{game.name}</strong><span class="muted small">{game.description}</span
+								></span
+							>
 						</label>
 					</li>
 				{/if}
@@ -181,9 +229,14 @@
 <section class="card block" aria-labelledby="access-heading">
 	<h2 id="access-heading">Access</h2>
 	{#if data.settings.passphraseSet}
-		<p class="muted">The league is locked with an office passphrase. Changing it signs everyone out.</p>
+		<p class="muted">
+			The league is locked with an office passphrase. Changing it signs everyone out.
+		</p>
 	{:else}
-		<p class="warning">The league is open: anyone with the link can record results. Set a passphrase to keep it to your colleagues.</p>
+		<p class="warning">
+			The league is open: anyone with the link can record results. Set a passphrase to keep it to
+			your colleagues.
+		</p>
 	{/if}
 
 	<form method="POST" action="?/passphrase" class="inline" use:enhance={refresh}>
@@ -191,7 +244,9 @@
 			<span>{data.settings.passphraseSet ? 'New passphrase' : 'Office passphrase'}</span>
 			<input type="text" name="passphrase" minlength="6" required autocomplete="off" />
 		</label>
-		<button class="btn btn-primary">{data.settings.passphraseSet ? 'Change' : 'Set passphrase'}</button>
+		<button class="btn btn-primary"
+			>{data.settings.passphraseSet ? 'Change' : 'Set passphrase'}</button
+		>
 	</form>
 	{#if saved === 'passphrase'}<p class="notice">Passphrase updated.</p>{/if}
 
@@ -200,9 +255,15 @@
 			<input type="hidden" name="publicRead" value={data.settings.publicRead ? '0' : '1'} />
 			<span>
 				<strong>Public rankings</strong>
-				<span class="muted small">{data.settings.publicRead ? 'Anyone can view, only colleagues can play.' : 'Only colleagues can view.'}</span>
+				<span class="muted small"
+					>{data.settings.publicRead
+						? 'Anyone can view, only colleagues can play.'
+						: 'Only colleagues can view.'}</span
+				>
 			</span>
-			<button class="btn btn-tonal">{data.settings.publicRead ? 'Make private' : 'Make public'}</button>
+			<button class="btn btn-tonal"
+				>{data.settings.publicRead ? 'Make private' : 'Make public'}</button
+			>
 		</form>
 		<form method="POST" action="?/removePassphrase" use:enhance={refresh}>
 			<button class="btn btn-danger">Remove passphrase</button>

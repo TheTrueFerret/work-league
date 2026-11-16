@@ -27,14 +27,24 @@
 	{#if cards.length}
 		<div class="games">
 			{#each cards as card (card.id)}
-				<a class="game" href="/{card.id}" style:--game="var(--game-{card.id})" style:--game-container="var(--game-{card.id}-container)" style:--game-on-container="var(--game-{card.id}-on-container)">
-					<span class="game-icon" aria-hidden="true"><Icon path={card.module.icon} size="1.6rem" /></span>
+				<a
+					class="game"
+					href="/{card.id}"
+					style:--game="var(--game-{card.id})"
+					style:--game-container="var(--game-{card.id}-container)"
+					style:--game-on-container="var(--game-{card.id}-on-container)"
+				>
+					<span class="game-icon" aria-hidden="true"
+						><Icon path={card.module.icon} size="1.6rem" /></span
+					>
 					<span class="game-text">
 						<strong>{card.module.name}</strong>
 						<span class="muted">{card.module.description}</span>
 						<span class="meta">
 							<span>{plural(card.matches, 'match', 'matches')}</span>
-							{#if card.leader}<span>👑 {card.leader.name} · <span class="num">{card.leader.rating}</span></span>{/if}
+							{#if card.leader}<span
+									>👑 {card.leader.name} · <span class="num">{card.leader.rating}</span></span
+								>{/if}
 						</span>
 					</span>
 				</a>
@@ -63,7 +73,9 @@
 	{:else}
 		<p class="card empty">Everyone's on the table. Play any game to start climbing it.</p>
 	{/if}
-	<p class="muted small">{plural(data.people, 'person', 'people')} in the running, across {plural(cards.length, 'game')}.</p>
+	<p class="muted small">
+		{plural(data.people, 'person', 'people')} in the running, across {plural(cards.length, 'game')}.
+	</p>
 </section>
 
 <style>

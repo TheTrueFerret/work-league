@@ -18,7 +18,11 @@ export const actions: Actions = {
 		const result = await attempt(async () => {
 			const { passphrase } = await readForm(event.request, v.object({ passphrase: v.string() }));
 			const stored = locals.settings.access.passphraseHash;
-			await guardedCheck(event, 'member', async () => !!stored && (await verifySecret(passphrase.trim(), stored)));
+			await guardedCheck(
+				event,
+				'member',
+				async () => !!stored && (await verifySecret(passphrase.trim(), stored))
+			);
 			const token = await signToken(locals.secret, {
 				kind: 'member',
 				version: locals.settings.access.passphraseVersion,

@@ -20,7 +20,13 @@
 </script>
 
 {#if shape}
-	<svg class="curve" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Rating over time, from {shape.lo} to {shape.hi}">
+	<svg
+		class="curve"
+		viewBox="0 0 100 100"
+		preserveAspectRatio="none"
+		role="img"
+		aria-label="Rating over time, from {shape.lo} to {shape.hi}"
+	>
 		<path class="area" d={shape.area} />
 		<path class="line" d={shape.line} vector-effect="non-scaling-stroke" />
 	</svg>

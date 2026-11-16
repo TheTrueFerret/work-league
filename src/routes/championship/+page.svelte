@@ -4,7 +4,11 @@
 
 	let { data } = $props();
 
-	const games = $derived(shell().gameIds.map((id) => findModule(id)).filter((g) => g !== undefined));
+	const games = $derived(
+		shell()
+			.gameIds.map((id) => findModule(id))
+			.filter((g) => g !== undefined)
+	);
 </script>
 
 <svelte:head><title>Championship · {shell().branding.name}</title></svelte:head>
@@ -13,8 +17,8 @@
 	<div>
 		<h1>Office championship</h1>
 		<p>
-			Everyone is in it. Your score is your average rating across every game, and a game you
-			haven't played counts at the starting rating.
+			Everyone is in it. Your score is your average rating across every game, and a game you haven't
+			played counts at the starting rating.
 		</p>
 	</div>
 </header>
@@ -43,7 +47,11 @@
 						<td class="rank num">{i + 1}</td>
 						<th scope="row"><a href="/players/{entry.playerId}">{entry.name}</a></th>
 						{#each entry.perGame as g (g.moduleId)}
-							<td class="num" class:unplayed={!g.played} title={g.played ? `${g.games} played` : 'Not played yet'}>{g.rating}</td>
+							<td
+								class="num"
+								class:unplayed={!g.played}
+								title={g.played ? `${g.games} played` : 'Not played yet'}>{g.rating}</td
+							>
 						{/each}
 						<td class="num score">{entry.score.toFixed(1)}</td>
 					</tr>
@@ -51,7 +59,9 @@
 			</tbody>
 		</table>
 	</div>
-	<p class="muted legend"><span class="unplayed-sample">1000</span> means a game not played yet, counted at the starting rating.</p>
+	<p class="muted legend">
+		<span class="unplayed-sample">1000</span> means a game not played yet, counted at the starting rating.
+	</p>
 {/if}
 
 <style>

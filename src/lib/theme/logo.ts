@@ -71,6 +71,9 @@ export function extractColours(image: HTMLImageElement, count = 4): string[] {
 		pixels.push(((255 << 24) | (data[i]! << 16) | (data[i + 1]! << 8) | data[i + 2]!) >>> 0);
 	}
 	if (!pixels.length) return [];
-	const ranked = Score.score(QuantizerCelebi.quantize(pixels, 128), { desired: count, filter: true });
+	const ranked = Score.score(QuantizerCelebi.quantize(pixels, 128), {
+		desired: count,
+		filter: true
+	});
 	return ranked.map((argb) => hexFromArgb(argb));
 }

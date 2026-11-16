@@ -28,16 +28,35 @@
 
 	<div class="finish-area">
 		{#if showNote}
-			<input type="text" bind:value={note} placeholder="Note (optional), e.g. best of 3" maxlength="120" />
+			<input
+				type="text"
+				bind:value={note}
+				placeholder="Note (optional), e.g. best of 3"
+				maxlength="120"
+			/>
 		{:else if ready}
-			<button type="button" class="btn btn-ghost add-note" onclick={() => (showNote = true)}>+ Add a note</button>
+			<button type="button" class="btn btn-ghost add-note" onclick={() => (showNote = true)}
+				>+ Add a note</button
+			>
 		{/if}
 
 		<div class="finish">
-			<button class="btn win" style:--side="var(--side-0)" style:--on-side="var(--on-side-0)" disabled={!ready || submitting} onclick={() => finish(0)}>
+			<button
+				class="btn win"
+				style:--side="var(--side-0)"
+				style:--on-side="var(--on-side-0)"
+				disabled={!ready || submitting}
+				onclick={() => finish(0)}
+			>
 				Team A won
 			</button>
-			<button class="btn win" style:--side="var(--side-1)" style:--on-side="var(--on-side-1)" disabled={!ready || submitting} onclick={() => finish(1)}>
+			<button
+				class="btn win"
+				style:--side="var(--side-1)"
+				style:--on-side="var(--on-side-1)"
+				disabled={!ready || submitting}
+				onclick={() => finish(1)}
+			>
 				Team B won
 			</button>
 		</div>

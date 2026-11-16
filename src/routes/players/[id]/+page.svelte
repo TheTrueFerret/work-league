@@ -7,7 +7,11 @@
 
 	let { data } = $props();
 
-	const games = $derived(shell().gameIds.map((id) => findModule(id)).filter((g) => g !== undefined));
+	const games = $derived(
+		shell()
+			.gameIds.map((id) => findModule(id))
+			.filter((g) => g !== undefined)
+	);
 	const game = $derived(data.gameId ? findModule(data.gameId) : undefined);
 	const standing = $derived(data.standings.find((s) => s.moduleId === data.gameId));
 	const ordinal = (n: number) => (n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`);
@@ -19,7 +23,9 @@
 	<div>
 		<h1>{data.player.name}</h1>
 		<p>
-			{#if game && standing}{tierFor(standing.rating, game.rating)} at {game.name.toLowerCase()}{:else}No matches yet{/if}{#if !data.player.active} · archived{/if}
+			{#if game && standing}{tierFor(standing.rating, game.rating)} at {game.name.toLowerCase()}{:else}No
+				matches yet{/if}{#if !data.player.active}
+				· archived{/if}
 		</p>
 	</div>
 	<a class="btn btn-ghost" href="/players">All people</a>
@@ -47,9 +53,13 @@
 	{@const s = standing}
 	<div class="card hero">
 		<div class="stats">
-			<div><strong class="num big">{s?.rating ?? game.rating.start}</strong><span>rating</span></div>
+			<div>
+				<strong class="num big">{s?.rating ?? game.rating.start}</strong><span>rating</span>
+			</div>
 			<div><strong class="num">{s?.wins ?? 0}–{s?.losses ?? 0}</strong><span>W–L</span></div>
-			<div><strong class="num">{percent(s?.wins ?? 0, s?.games ?? 0)}</strong><span>win rate</span></div>
+			<div>
+				<strong class="num">{percent(s?.wins ?? 0, s?.games ?? 0)}</strong><span>win rate</span>
+			</div>
 			<div><strong class="num">{s?.peak ?? game.rating.start}</strong><span>peak</span></div>
 		</div>
 		<RatingCurve points={data.profile.curve} />
@@ -59,7 +69,10 @@
 		<h2 class="section-label">{game.name} stats</h2>
 		<dl class="card extra">
 			{#each data.profile.stats as line (line.label)}
-				<div><dt>{line.label}</dt><dd class="num">{line.value}</dd></div>
+				<div>
+					<dt>{line.label}</dt>
+					<dd class="num">{line.value}</dd>
+				</div>
 			{/each}
 		</dl>
 	{/if}
@@ -71,7 +84,8 @@
 				<li class="card row">
 					<a href="/players/{rival.id}?game={game.id}">{rival.name}</a>
 					<span class="num end">
-						<span class="delta up">{rival.wins}</span> – <span class="delta down">{rival.losses}</span>
+						<span class="delta up">{rival.wins}</span> –
+						<span class="delta down">{rival.losses}</span>
 					</span>
 				</li>
 			{/each}
@@ -83,7 +97,9 @@
 		<ul class="stack tight">
 			{#each data.profile.matches as m (m.id)}
 				<li class="card row">
-					<span class="result" class:won={m.won}>{m.won ? 'Won' : m.placement > 2 ? ordinal(m.placement) : 'Lost'}</span>
+					<span class="result" class:won={m.won}
+						>{m.won ? 'Won' : m.placement > 2 ? ordinal(m.placement) : 'Lost'}</span
+					>
 					<span class="vs">
 						{#if m.opponents.length}<span class="muted">vs</span> {m.opponents.join(', ')}{/if}
 						{#if m.summary}<span class="muted num"> · {m.summary}</span>{/if}

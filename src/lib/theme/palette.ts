@@ -22,7 +22,16 @@ import {
 export const DEFAULT_SEED = '#3dcd58';
 
 /** Colours for teams and free-for-all players, in side order. */
-const SIDE_COLOURS = ['#0a6ed1', '#e07000', '#8e44ad', '#00897b', '#d81b60', '#c0a000', '#6d4c41', '#0097a7'];
+const SIDE_COLOURS = [
+	'#0a6ed1',
+	'#e07000',
+	'#8e44ad',
+	'#00897b',
+	'#d81b60',
+	'#c0a000',
+	'#6d4c41',
+	'#0097a7'
+];
 const WIN = '#2e9e4f';
 
 export interface ModuleAccent {
@@ -34,7 +43,11 @@ export const isHexColour = (value: string): boolean => /^#[0-9a-f]{6}$/i.test(va
 
 type Tokens = Record<string, string>;
 
-function schemeTokens(scheme: DynamicScheme, seed: number, modules: readonly ModuleAccent[]): Tokens {
+function schemeTokens(
+	scheme: DynamicScheme,
+	seed: number,
+	modules: readonly ModuleAccent[]
+): Tokens {
 	const c = (colour: { getArgb(s: DynamicScheme): number }) => hexFromArgb(colour.getArgb(scheme));
 	const dark = scheme.isDark;
 	const tone = (argb: number, light: number, night: number) =>

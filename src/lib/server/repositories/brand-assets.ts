@@ -24,7 +24,9 @@ export async function getBrandAsset(key: BrandAssetKey) {
 	return row ?? null;
 }
 
-export async function saveBrandAssets(assets: ReadonlyMap<BrandAssetKey, Uint8Array>): Promise<void> {
+export async function saveBrandAssets(
+	assets: ReadonlyMap<BrandAssetKey, Uint8Array>
+): Promise<void> {
 	const db = await getDb();
 	await db.transaction(async (tx) => {
 		for (const [key, data] of assets) {

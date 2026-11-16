@@ -55,8 +55,9 @@ async function open(url: string, maxConnections: number): Promise<Connection> {
  * PGlite locks its data directory, so there must only ever be one per path —
  * even when Vite reloads this file during development. Kept on globalThis for that.
  */
-const embedded = ((globalThis as { __workLeaguePglite?: Map<string, Promise<Connection>> })
-	.__workLeaguePglite ??= new Map());
+const embedded = ((
+	globalThis as { __workLeaguePglite?: Map<string, Promise<Connection>> }
+).__workLeaguePglite ??= new Map());
 
 function openPglite(url: string): Promise<Connection> {
 	const existing = embedded.get(url);

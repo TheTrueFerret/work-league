@@ -48,14 +48,18 @@
 					<a class="row" href="/players/{p.id}?game={game.id}">
 						<span class="rank num" class:top={i < 3}>{medal[i] ?? i + 1}</span>
 						<span class="who">
-							<span class="name">{p.name}{#if !p.active}<span class="pill">archived</span>{/if}</span>
+							<span class="name"
+								>{p.name}{#if !p.active}<span class="pill">archived</span>{/if}</span
+							>
 							<span class="sub">
 								<span class="num">{p.wins}W&thinsp;–&thinsp;{p.losses}L</span>
 								<span class="dot">·</span>
 								<span>{tierFor(p.rating, game.rating)}</span>
 								{#if streakLabel(p.streak)}
 									<span class="dot">·</span>
-									<span class:hot={p.streak > 0} class:cold={p.streak < 0}>{streakLabel(p.streak)}</span>
+									<span class:hot={p.streak > 0} class:cold={p.streak < 0}
+										>{streakLabel(p.streak)}</span
+									>
 								{/if}
 							</span>
 						</span>
@@ -72,7 +76,8 @@
 	{:else}
 		<div class="card empty">
 			<p>No {game.name.toLowerCase()} matches yet.</p>
-			{#if shell().member}<a class="btn btn-primary" href="/{game.id}/play">Play the first one</a>{/if}
+			{#if shell().member}<a class="btn btn-primary" href="/{game.id}/play">Play the first one</a
+				>{/if}
 		</div>
 	{/if}
 
@@ -83,7 +88,9 @@
 				<li>
 					<a class="row quiet" href="/players/{p.id}?game={game.id}">
 						<span class="rank">–</span>
-						<span class="who"><span class="name">{p.name}</span><span class="sub">No matches yet</span></span>
+						<span class="who"
+							><span class="name">{p.name}</span><span class="sub">No matches yet</span></span
+						>
 						<span class="rating num muted">{p.rating}</span>
 					</a>
 				</li>

@@ -31,7 +31,10 @@ export async function attempt<T>(
 /** Form fields arrive as strings; these coerce them. */
 export const formId = v.pipe(v.string(), v.toNumber(), v.integer(), v.minValue(1));
 export const formText = (max: number) => v.pipe(v.string(), v.trim(), v.maxLength(max));
-export const formFlag = v.pipe(v.optional(v.string(), ''), v.transform((s) => s === '1' || s === 'on' || s === 'true'));
+export const formFlag = v.pipe(
+	v.optional(v.string(), ''),
+	v.transform((s) => s === '1' || s === 'on' || s === 'true')
+);
 
 export function requireAdmin(locals: App.Locals): void {
 	if (!locals.admin) error(403, 'Only an admin can do that');

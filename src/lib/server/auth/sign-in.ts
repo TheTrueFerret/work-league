@@ -4,7 +4,8 @@ import { clearFailures, isLockedOut, recordFailure } from './rate-limit';
 
 /** Where to go after signing in. Only same-site paths, never another origin. */
 export function safeNext(raw: string | null, fallback = '/'): string {
-	if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) return fallback;
+	if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\'))
+		return fallback;
 	return raw;
 }
 
@@ -33,7 +34,9 @@ export async function guardedCheck(
 	}
 	if (!(await check())) {
 		await recordFailure(key);
-		throw new UserError(kind === 'admin' ? 'That is not the admin password' : 'That is not the passphrase');
+		throw new UserError(
+			kind === 'admin' ? 'That is not the admin password' : 'That is not the passphrase'
+		);
 	}
 	await clearFailures(key);
 }

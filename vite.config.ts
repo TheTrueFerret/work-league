@@ -9,7 +9,7 @@ import { defineConfig, loadEnv } from 'vite';
  */
 const target = process.env.WORK_LEAGUE_ADAPTER === 'node' ? 'node' : 'cloudflare';
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
 	// Mirror .env into process.env during dev so the database client and the
 	// scripts see the same configuration. Cloudflare passes it per request.
 	Object.assign(process.env, loadEnv(mode, process.cwd(), ''));
@@ -25,6 +25,15 @@ export default defineConfig(({ mode }) => {
 				adapter: target === 'node' ? node({ out: 'build' }) : cloudflare()
 			})
 		],
+		resolve: {
+			alias:
+				command === 'build' && target === 'cloudflare'
+					? {
+							'@electric-sql/pglite': '/src/lib/server/db/pglite-unavailable.ts',
+							'drizzle-orm/pglite': '/src/lib/server/db/pglite-unavailable.ts'
+						}
+					: {}
+		},
 		ssr: {
 			// Its published ESM has an import without a file extension, which Node
 			// rejects; letting Vite bundle it resolves that.

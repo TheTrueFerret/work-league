@@ -92,7 +92,8 @@ export async function recordMatch<Details>(
 	validateSides(module, sides);
 	const details = parseDetails(module, submission.details);
 	const placements = module.resolve(details, sides);
-	if (placements.length !== sides.length) throw new Error(`${module.id}.resolve returned the wrong number of placements`);
+	if (placements.length !== sides.length)
+		throw new Error(`${module.id}.resolve returned the wrong number of placements`);
 
 	const note = submission.note?.trim().slice(0, MAX_NOTE_LENGTH) || null;
 	const ids = sides.flat();
@@ -119,7 +120,8 @@ export async function recordMatch<Details>(
 			.where(and(eq(ratings.moduleId, module.id), inArray(ratings.playerId, ids)))
 			.for('update');
 		const before = new Map<number, Standing>(current.map((row) => [row.playerId, row]));
-		const standingOf = (id: number): Standing => before.get(id) ?? blankStanding(id, module.rating.start);
+		const standingOf = (id: number): Standing =>
+			before.get(id) ?? blankStanding(id, module.rating.start);
 
 		const competitors: Competitor[][] = sides.map((side) =>
 			side.map((id) => ({ id, rating: standingOf(id).rating, games: standingOf(id).games }))
@@ -146,14 +148,19 @@ export async function recordMatch<Details>(
 		await writeStandings(
 			tx,
 			module.id,
-			lines.map((l) => advanceStanding(standingOf(l.playerId), l.placement === 1, l.delta, match.playedAt))
+			lines.map((l) =>
+				advanceStanding(standingOf(l.playerId), l.placement === 1, l.delta, match.playedAt)
+			)
 		);
 		return match.id;
 	});
 }
 
 /** Removes a match and replays its game, since every later rating depended on it. */
-export async function deleteMatch(id: number, modules: (moduleId: string) => GameModule | undefined): Promise<void> {
+export async function deleteMatch(
+	id: number,
+	modules: (moduleId: string) => GameModule | undefined
+): Promise<void> {
 	const db = await getDb();
 	await db.transaction(async (tx) => {
 		const [match] = await tx
@@ -190,7 +197,12 @@ async function replayModule(db: Database, module: GameModule): Promise<void> {
 		.from(matchPlayers)
 		.innerJoin(matches, eq(matches.id, matchPlayers.matchId))
 		.where(eq(matches.moduleId, module.id))
-		.orderBy(asc(matches.playedAt), asc(matches.id), asc(matchPlayers.side), asc(matchPlayers.playerId));
+		.orderBy(
+			asc(matches.playedAt),
+			asc(matches.id),
+			asc(matchPlayers.side),
+			asc(matchPlayers.playerId)
+		);
 
 	const state = new Map<number, Standing>();
 	const standingOf = (id: number): Standing =>
@@ -204,13 +216,22 @@ async function replayModule(db: Database, module: GameModule): Promise<void> {
 
 		const placements = sides.map((side) => side[0]!.placement);
 		const competitors = sides.map((side) =>
-			side.map((r) => ({ id: r.playerId, rating: standingOf(r.playerId).rating, games: standingOf(r.playerId).games }))
+			side.map((r) => ({
+				id: r.playerId,
+				rating: standingOf(r.playerId).rating,
+				games: standingOf(r.playerId).games
+			}))
 		);
 		const deltas = computeDeltas(competitors, placements, module.rating);
 		for (const r of match) {
 			const before = standingOf(r.playerId);
 			const delta = deltas.get(r.playerId) ?? 0;
-			updates.push({ matchId: r.matchId, playerId: r.playerId, ratingBefore: before.rating, delta });
+			updates.push({
+				matchId: r.matchId,
+				playerId: r.playerId,
+				ratingBefore: before.rating,
+				delta
+			});
 			state.set(r.playerId, advanceStanding(before, r.placement === 1, delta, r.playedAt));
 		}
 	};
@@ -228,7 +249,10 @@ async function replayModule(db: Database, module: GameModule): Promise<void> {
 			update match_players as mp
 			set rating_before = u.rating_before, delta = u.delta
 			from (values ${sql.join(
-				batch.map((u) => sql`(${u.matchId}::int, ${u.playerId}::int, ${u.ratingBefore}::int, ${u.delta}::int)`),
+				batch.map(
+					(u) =>
+						sql`(${u.matchId}::int, ${u.playerId}::int, ${u.ratingBefore}::int, ${u.delta}::int)`
+				),
 				sql`, `
 			)}) as u(match_id, player_id, rating_before, delta)
 			where mp.match_id = u.match_id and mp.player_id = u.player_id
@@ -377,7 +401,13 @@ function groupSides(lines: readonly HistoryLine[]): HistoryMatch['sides'] {
 export async function history(module: GameModule, limit = 100): Promise<HistoryMatch[]> {
 	const db = await getDb();
 	const recent = await db
-		.select({ id: matches.id, moduleId: matches.moduleId, playedAt: matches.playedAt, note: matches.note, details: matches.details })
+		.select({
+			id: matches.id,
+			moduleId: matches.moduleId,
+			playedAt: matches.playedAt,
+			note: matches.note,
+			details: matches.details
+		})
 		.from(matches)
 		.where(eq(matches.moduleId, module.id))
 		.orderBy(desc(matches.playedAt), desc(matches.id))
@@ -451,7 +481,12 @@ export async function playerGameProfile(module: GameModule, playerId: number) {
 	for (const match of played) {
 		for (const other of linesByMatch.get(match.id) ?? []) {
 			if (other.side === match.side) continue;
-			const rival = rivals.get(other.playerId) ?? { id: other.playerId, name: other.name, wins: 0, losses: 0 };
+			const rival = rivals.get(other.playerId) ?? {
+				id: other.playerId,
+				name: other.name,
+				wins: 0,
+				losses: 0
+			};
 			if (match.placement < other.placement) rival.wins++;
 			else if (match.placement > other.placement) rival.losses++;
 			rivals.set(other.playerId, rival);
@@ -491,7 +526,9 @@ export async function playerGameProfile(module: GameModule, playerId: number) {
 				delta: m.delta,
 				ratingAfter: m.ratingBefore + m.delta,
 				summary: summarize(module, m.details),
-				opponents: (linesByMatch.get(m.id) ?? []).filter((l) => l.side !== m.side).map((l) => l.name)
+				opponents: (linesByMatch.get(m.id) ?? [])
+					.filter((l) => l.side !== m.side)
+					.map((l) => l.name)
 			}))
 			.reverse(),
 		rivals: [...rivals.values()].sort(
