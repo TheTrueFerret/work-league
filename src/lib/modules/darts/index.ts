@@ -61,14 +61,7 @@ export default defineModule<DartsDetails>({
 	format: { sides: { min: 2, max: 8 }, playersPerSide: { min: 1, max: 2 } },
 	rating: {
 		start: DEFAULT_START_RATING,
-		kFactor: defaultKFactor,
-		tiers: [
-			{ min: 1400, name: 'Nine-darter' },
-			{ min: 1250, name: 'Ton-eighty' },
-			{ min: 1100, name: 'Oche regular' },
-			{ min: 950, name: 'Double trouble' },
-			{ min: -Infinity, name: 'Bed of nails' }
-		]
+		kFactor: defaultKFactor
 	},
 	details: v.object({
 		setup: SetupSchema,

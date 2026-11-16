@@ -21,14 +21,7 @@ export default defineModule<PoolDetails>({
 	format: { sides: { min: 2, max: 2 }, playersPerSide: { min: 1, max: 8 } },
 	rating: {
 		start: DEFAULT_START_RATING,
-		kFactor: defaultKFactor,
-		tiers: [
-			{ min: 1400, name: 'Shark' },
-			{ min: 1250, name: 'Hustler' },
-			{ min: 1100, name: 'Regular' },
-			{ min: 950, name: 'Casual' },
-			{ min: -Infinity, name: 'Rookie' }
-		]
+		kFactor: defaultKFactor
 	},
 	details: v.object({ winner: v.optional(v.picklist([0, 1])) }),
 	resolve(details) {

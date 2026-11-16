@@ -1,13 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	computeDeltas,
-	defaultKFactor,
-	defaultRating,
-	expectedScore,
-	tierFor,
-	winChances,
-	type Competitor
-} from './elo';
+import { computeDeltas, defaultKFactor, expectedScore, winChances, type Competitor } from './elo';
 
 const p = (id: number, rating: number, games = 50): Competitor => ({ id, rating, games });
 const duel = (a: Competitor[], b: Competitor[], winner: 0 | 1) =>
@@ -126,11 +118,5 @@ describe('expected score and K', () => {
 		expect(defaultKFactor(0)).toBe(40);
 		expect(defaultKFactor(15)).toBe(28);
 		expect(defaultKFactor(100)).toBe(20);
-	});
-
-	it('names tiers from the top', () => {
-		expect(tierFor(defaultRating.start)).toBe('Casual');
-		expect(tierFor(1500)).toBe('Legend');
-		expect(tierFor(800)).toBe('Rookie');
 	});
 });

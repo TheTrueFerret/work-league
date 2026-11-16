@@ -38,12 +38,7 @@ export default defineModule<FoosballDetails>({
 	format: { sides: { min: 2, max: 2 }, playersPerSide: { min: 1, max: 2 } },
 	rating: {
 		start: DEFAULT_START_RATING,
-		kFactor: defaultKFactor,
-		tiers: [
-			{ min: 1300, name: 'Wizard' },
-			{ min: 1100, name: 'Spinner' },
-			{ min: -Infinity, name: 'Rookie' }
-		]
+		kFactor: defaultKFactor
 	},
 	// Validates what the browser sends. Never trust it further than this.
 	details: v.object({

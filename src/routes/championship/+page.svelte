@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { shell } from '$lib/shell';
+	import RankBadge from '$lib/components/RankBadge.svelte';
+	import { DEFAULT_START_RATING } from '$lib/core/rating/elo';
 	import { findModule } from '$lib/modules/registry';
 
 	let { data } = $props();
@@ -34,18 +36,22 @@
 			<thead>
 				<tr>
 					<th scope="col" class="rank">#</th>
-					<th scope="col">Player</th>
+					<th scope="col" class="player">Player</th>
+					<th scope="col" class="num">Score</th>
 					{#each games as g (g.id)}
 						<th scope="col" class="num game" style:--game="var(--game-{g.id})">{g.name}</th>
 					{/each}
-					<th scope="col" class="num">Score</th>
 				</tr>
 			</thead>
 			<tbody>
 				{#each data.table as entry, i (entry.playerId)}
 					<tr>
 						<td class="rank num">{i + 1}</td>
-						<th scope="row"><a href="/players/{entry.playerId}">{entry.name}</a></th>
+						<th scope="row" class="player">
+							<a href="/players/{entry.playerId}">{entry.name}</a>
+							<RankBadge rating={entry.score} start={DEFAULT_START_RATING} games={entry.games} />
+						</th>
+						<td class="num score">{entry.score.toFixed(1)}</td>
 						{#each entry.perGame as g (g.moduleId)}
 							<td
 								class="num"
@@ -53,7 +59,6 @@
 								title={g.played ? `${g.games} played` : 'Not played yet'}>{g.rating}</td
 							>
 						{/each}
-						<td class="num score">{entry.score.toFixed(1)}</td>
 					</tr>
 				{/each}
 			</tbody>
@@ -108,7 +113,17 @@
 	}
 
 	tbody th a {
+		display: block;
+		margin-bottom: 0.15rem;
 		text-decoration: none;
+	}
+
+	/* The name, badge and score stay put while the game columns scroll. */
+	.player {
+		position: sticky;
+		left: 0;
+		z-index: 1;
+		background: var(--surface);
 	}
 
 	.num {

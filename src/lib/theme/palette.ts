@@ -8,6 +8,7 @@ import {
 	TonalPalette,
 	type DynamicScheme
 } from '@material/material-color-utilities';
+import { RANKS } from '$lib/core/rating/ranks';
 
 /**
  * Turns one brand colour into the whole UI palette, the way Android's
@@ -80,6 +81,16 @@ function schemeTokens(
 		tokens[`--side-${i}`] = tone(argb, 45, 75);
 		tokens[`--on-side-${i}`] = tone(argb, 100, 10);
 	});
+
+	// Rank metals keep their own hue (gold must look gold under any brand);
+	// only their tones follow the scheme, which keeps the badges readable.
+	for (const rank of RANKS) {
+		const palette = TonalPalette.fromInt(argbFromHex(rank.colour));
+		const at = (light: number, night: number) => hexFromArgb(palette.tone(dark ? night : light));
+		tokens[`--rank-${rank.id}`] = at(45, 80);
+		tokens[`--rank-${rank.id}-soft`] = at(92, 25);
+		tokens[`--rank-${rank.id}-on-soft`] = at(25, 90);
+	}
 
 	for (const module of modules) {
 		const argb = argbFromHex(isHexColour(module.accent) ? module.accent : DEFAULT_SEED);

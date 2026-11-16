@@ -20,6 +20,11 @@ describe('palette', () => {
 			).toBeGreaterThanOrEqual(4.5);
 			expect(contrast(scheme['--muted']!, scheme['--surface']!)).toBeGreaterThanOrEqual(4.5);
 			expect(contrast(scheme['--on-side-0']!, scheme['--side-0']!)).toBeGreaterThanOrEqual(3);
+			for (const rank of ['bronze', 'silver', 'gold', 'platinum', 'diamond']) {
+				expect(
+					contrast(scheme[`--rank-${rank}-on-soft`]!, scheme[`--rank-${rank}-soft`]!)
+				).toBeGreaterThanOrEqual(4.5);
+			}
 		}
 	});
 

@@ -15,13 +15,6 @@ export interface RatingConfig {
 	readonly start: number;
 	/** How far a single match can move a player who has played `games` before it. */
 	readonly kFactor: (games: number) => number;
-	/** Cosmetic titles, highest threshold first. */
-	readonly tiers: readonly Tier[];
-}
-
-export interface Tier {
-	readonly min: number;
-	readonly name: string;
 }
 
 export interface Competitor {
@@ -41,14 +34,7 @@ export const DEFAULT_START_RATING = 1000;
 
 export const defaultRating: RatingConfig = {
 	start: DEFAULT_START_RATING,
-	kFactor: defaultKFactor,
-	tiers: [
-		{ min: 1400, name: 'Legend' },
-		{ min: 1250, name: 'Pro' },
-		{ min: 1100, name: 'Regular' },
-		{ min: 950, name: 'Casual' },
-		{ min: -Infinity, name: 'Rookie' }
-	]
+	kFactor: defaultKFactor
 };
 
 /** Probability that `rating` beats `opponent`. */
@@ -116,9 +102,4 @@ export function winChances(sides: readonly (readonly Competitor[])[]): number[] 
 			averages.reduce((sum, theirs, j) => (i === j ? sum : sum + expectedScore(mine, theirs)), 0) /
 			pairs
 	);
-}
-
-/** A friendly title for a rating, purely cosmetic. */
-export function tierFor(rating: number, config: RatingConfig = defaultRating): string {
-	return config.tiers.find((tier) => rating >= tier.min)?.name ?? '';
 }

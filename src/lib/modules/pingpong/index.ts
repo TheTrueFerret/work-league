@@ -29,14 +29,7 @@ export default defineModule<PingPongDetails>({
 	format: { sides: { min: 2, max: 2 }, playersPerSide: { min: 1, max: 2 } },
 	rating: {
 		start: DEFAULT_START_RATING,
-		kFactor: defaultKFactor,
-		tiers: [
-			{ min: 1400, name: 'Smash master' },
-			{ min: 1250, name: 'Topspinner' },
-			{ min: 1100, name: 'Rallier' },
-			{ min: 950, name: 'Pusher' },
-			{ min: -Infinity, name: 'Net cord' }
-		]
+		kFactor: defaultKFactor
 	},
 	details: detailsSchema,
 	resolve(details) {

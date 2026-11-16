@@ -2,7 +2,8 @@
 	import { shell } from '$lib/shell';
 	import RatingCurve from '$lib/components/RatingCurve.svelte';
 	import { percent, shortDate, signed } from '$lib/core/format';
-	import { tierFor } from '$lib/core/rating/elo';
+	import RankBadge from '$lib/components/RankBadge.svelte';
+	import { rankProgress } from '$lib/core/rating/ranks';
 	import { findModule } from '$lib/modules/registry';
 
 	let { data } = $props();
@@ -22,10 +23,16 @@
 <header class="page-head">
 	<div>
 		<h1>{data.player.name}</h1>
-		<p>
-			{#if game && standing}{tierFor(standing.rating, game.rating)} at {game.name.toLowerCase()}{:else}No
-				matches yet{/if}{#if !data.player.active}
-				· archived{/if}
+		<p class="rank-line">
+			{#if game}
+				<RankBadge
+					rating={standing?.rating ?? game.rating.start}
+					start={game.rating.start}
+					games={standing?.games ?? 0}
+					size="md"
+				/>
+				<span>at {game.name.toLowerCase()}</span>
+			{/if}{#if !data.player.active}<span>· archived</span>{/if}
 		</p>
 	</div>
 	<a class="btn btn-ghost" href="/players">All people</a>
@@ -62,6 +69,30 @@
 			</div>
 			<div><strong class="num">{s?.peak ?? game.rating.start}</strong><span>peak</span></div>
 		</div>
+		{#if s && s.games > 0}
+			{@const climb = rankProgress(s.rating, game.rating.start)}
+			<div class="climb">
+				<div class="climb-label">
+					<RankBadge rating={s.rating} start={game.rating.start} />
+					{#if climb.next}
+						<span class="muted num">{climb.toGo} to {climb.next.name}</span>
+					{:else}
+						<span class="muted">Top rank</span>
+					{/if}
+				</div>
+				<div
+					class="bar"
+					role="progressbar"
+					aria-label="Progress to {climb.next?.name ?? 'the top'}"
+					aria-valuenow={Math.round(climb.progress * 100)}
+					aria-valuemin={0}
+					aria-valuemax={100}
+					style:--metal="var(--rank-{(climb.next ?? climb.rank).id})"
+				>
+					<i style:width="{climb.progress * 100}%"></i>
+				</div>
+			</div>
+		{/if}
 		<RatingCurve points={data.profile.curve} />
 	</div>
 
@@ -151,6 +182,40 @@
 
 	.games a.active span {
 		color: inherit;
+	}
+
+	.rank-line {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		align-items: center;
+		margin-top: 0.35rem !important;
+	}
+
+	.climb {
+		margin-top: 1rem;
+	}
+
+	.climb-label {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 0.4rem;
+		font-size: 0.8rem;
+	}
+
+	.bar {
+		height: 0.45rem;
+		overflow: hidden;
+		background: var(--surface-2);
+		border-radius: 999px;
+	}
+
+	.bar i {
+		display: block;
+		height: 100%;
+		background: var(--metal);
+		border-radius: inherit;
 	}
 
 	.hero {

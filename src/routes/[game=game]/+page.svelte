@@ -2,7 +2,7 @@
 	import { shell } from '$lib/shell';
 	import { page } from '$app/state';
 	import { plural } from '$lib/core/format';
-	import { tierFor } from '$lib/core/rating/elo';
+	import RankBadge from '$lib/components/RankBadge.svelte';
 	import { findModule } from '$lib/modules/registry';
 
 	let { data } = $props();
@@ -49,12 +49,13 @@
 						<span class="rank num" class:top={i < 3}>{medal[i] ?? i + 1}</span>
 						<span class="who">
 							<span class="name"
-								>{p.name}{#if !p.active}<span class="pill">archived</span>{/if}</span
+								>{p.name}
+								<RankBadge rating={p.rating} start={game.rating.start} />{#if !p.active}<span
+										class="pill">archived</span
+									>{/if}</span
 							>
 							<span class="sub">
 								<span class="num">{p.wins}W&thinsp;–&thinsp;{p.losses}L</span>
-								<span class="dot">·</span>
-								<span>{tierFor(p.rating, game.rating)}</span>
 								{#if streakLabel(p.streak)}
 									<span class="dot">·</span>
 									<span class:hot={p.streak > 0} class:cold={p.streak < 0}

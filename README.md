@@ -11,6 +11,7 @@ clone it, host it for your office, make it yours.
   <img src="docs/screenshots/home.png" width="200" alt="The league home screen with pool, ping pong and darts">
   <img src="docs/screenshots/darts-scorer.png" width="200" alt="The darts scorer suggesting a checkout">
   <img src="docs/screenshots/pingpong-scorer.png" width="200" alt="The ping pong point-by-point scorer">
+  <img src="docs/screenshots/ranks.png" width="200" alt="Darts rankings with Bronze to Platinum rank badges">
   <img src="docs/screenshots/rebranded.png" width="200" alt="The same league rebranded in blue">
 </p>
 
@@ -19,6 +20,8 @@ clone it, host it for your office, make it yours.
 - **Game modules.** Each game is one folder with its own rules and its own match screen. Pool
   records teams of any size, ping pong has a point-by-point scorer, and darts has a full X01
   calculator with checkout hints. Admins switch games on and off without redeploying.
+- **Ranks from Bronze to Diamond** in every game and in the championship, with progress to the
+  next one on your profile.
 - **ELO for every game.** One shared engine handles singles, teams and free-for-alls. Upsets pay,
   newcomers find their level fast, veterans settle down, and you see what you stand to win or lose
   before you play. Deleting an old result replays everything after it.
@@ -90,6 +93,20 @@ change   = K × Σ(result - expected) / (sides - 1)
 `result` is 1 for finishing ahead of that side, 0.5 for a tie, and 0 for finishing behind. `K` is 40 for
 a player's first 10 games, 28 up to 30 games, and 20 after that. With two sides this is classic team
 ELO; in a darts free-for-all a match still moves a player by at most one K.
+
+### Ranks
+
+Every game and the championship share one ladder, measured from the starting rating:
+
+| Rank     | Rating (start 1000) |
+| -------- | ------------------- |
+| Diamond  | 1200 and up         |
+| Platinum | 1125–1199           |
+| Gold     | 1050–1124           |
+| Silver   | 975–1049            |
+| Bronze   | below 975           |
+
+Everyone starts in Silver. Profiles show how many points you need for the next rank.
 
 ## Adding a game
 

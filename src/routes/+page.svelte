@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { shell } from '$lib/shell';
 	import Icon from '$lib/components/Icon.svelte';
+	import RankBadge from '$lib/components/RankBadge.svelte';
+	import { DEFAULT_START_RATING } from '$lib/core/rating/elo';
 	import { plural } from '$lib/core/format';
 	import { findModule } from '$lib/modules/registry';
 
@@ -66,6 +68,7 @@
 				<li class="card">
 					<span class="medal" aria-hidden="true">{medal[i]}</span>
 					<a href="/players/{entry.playerId}">{entry.name}</a>
+					<RankBadge rating={entry.score} start={DEFAULT_START_RATING} />
 					<span class="num score">{Math.round(entry.score)}</span>
 				</li>
 			{/each}
