@@ -1,36 +1,40 @@
-// Applies every pending migration in ./drizzle. Run: npm run db:migrate
+// Applies every pending migration in ./drizzle to the libSQL database at
+// DATABASE_URL (a local `file:` SQLite database, or `libsql://`). Run: npm run db:migrate
 //
-// Works with a real PostgreSQL URL or an embedded `pglite:./path` database.
+// Cloudflare D1 is migrated by Wrangler instead: npm run db:migrate:d1
+//
 // Deliberately imports nothing from src/, so it runs with plain Node — the
 // Docker image uses it on start-up.
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createClient } from '@libsql/client';
+import { drizzle } from 'drizzle-orm/libsql';
+import { migrate } from 'drizzle-orm/libsql/migrator';
 
 const url = process.env.DATABASE_URL;
 if (!url) {
 	console.error('DATABASE_URL is not set. Copy .env.example to .env, or export it.');
 	process.exit(1);
 }
+if (/^(postgres(ql)?|pglite):/.test(url)) {
+	console.error(
+		'Work League now stores its data in SQLite. Set DATABASE_URL=file:./.data/league.db and ' +
+			'bring existing data across with `npm run import:postgres` (see README).'
+	);
+	process.exit(1);
+}
 
 const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), '../drizzle');
 
-if (url.startsWith('pglite:')) {
-	const path = url.slice('pglite:'.length);
-	const { PGlite } = await import('@electric-sql/pglite');
-	const { drizzle } = await import('drizzle-orm/pglite');
-	const { migrate } = await import('drizzle-orm/pglite/migrator');
-	if (path && path !== 'memory') mkdirSync(path, { recursive: true });
-	const client = path && path !== 'memory' ? new PGlite(path) : new PGlite();
-	await migrate(drizzle(client), { migrationsFolder });
-	await client.close();
-} else {
-	const { default: postgres } = await import('postgres');
-	const { drizzle } = await import('drizzle-orm/postgres-js');
-	const { migrate } = await import('drizzle-orm/postgres-js/migrator');
-	const client = postgres(url, { max: 1, prepare: false, onnotice: () => {} });
-	await migrate(drizzle(client), { migrationsFolder });
-	await client.end();
+if (url.startsWith('file:')) {
+	const path = url.slice('file:'.length).split('?')[0]!;
+	if (path && path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
 }
+
+const client = createClient({ url });
+await client.execute('PRAGMA foreign_keys = ON');
+await migrate(drizzle(client), { migrationsFolder });
+client.close();
 
 console.log('Database is up to date.');

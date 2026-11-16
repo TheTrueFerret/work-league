@@ -1,131 +1,112 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
+import type { AnyD1Database, DrizzleD1Database } from 'drizzle-orm/d1';
 import * as schema from './schema';
 
 /**
- * One drizzle API over two drivers:
+ * One drizzle API over two SQLite drivers:
  *
- * - `postgres://…` — any real PostgreSQL (Supabase, Neon, Docker, …) through postgres.js.
- * - `pglite:./path` or `pglite:memory` — an embedded Postgres in the Node process.
- *   Zero setup for local development, tests and tiny self-hosted installs.
- *   It cannot run on Cloudflare Workers.
+ * - Cloudflare D1, through the `DB` binding, on Workers.
+ * - libSQL everywhere else: `file:./path.db` for a local SQLite file (dev,
+ *   tests, Docker, any Node host), or a `libsql://` URL for a hosted libSQL
+ *   database such as Turso.
+ *
+ * Both are async and both support `db.batch()`, which is the only way to make
+ * several writes atomic on D1: it has no interactive transactions. So code here
+ * never calls `db.transaction()`; see repositories/matches.ts.
  */
-export type Database = PgDatabase<PgQueryResultHKT, typeof schema>;
+export type Database = DrizzleD1Database<typeof schema>;
 
 interface Connection {
 	readonly db: Database;
-	close(): Promise<void>;
+	close(): void;
 }
-
-const MISSING_URL =
-	'DATABASE_URL is not set. On Cloudflare run `npx wrangler secret put DATABASE_URL`; ' +
-	'locally, copy .env.example to .env.';
 
 export class DatabaseNotConfiguredError extends Error {
 	override readonly name = 'DatabaseNotConfiguredError';
-	constructor() {
-		super(MISSING_URL);
+	constructor(message?: string) {
+		super(
+			message ??
+				'No database configured. On Cloudflare, give the Worker a D1 binding named DB ' +
+					'(see wrangler.jsonc); elsewhere set DATABASE_URL, e.g. file:./.data/league.db.'
+		);
 	}
 }
 
-export const isPglite = (url: string): boolean => url.startsWith('pglite:');
+/** Work League 0.1 ran on PostgreSQL. Point anyone still configured for it at the importer. */
+function rejectPostgres(url: string): void {
+	if (/^(postgres(ql)?|pglite):/.test(url)) {
+		throw new DatabaseNotConfiguredError(
+			'Work League now stores its data in SQLite (Cloudflare D1, or a local file). ' +
+				'Set DATABASE_URL=file:./.data/league.db, and move existing data across with ' +
+				'`npm run import:postgres` (see README).'
+		);
+	}
+}
 
-async function open(url: string, maxConnections: number): Promise<Connection> {
-	if (isPglite(url)) return openPglite(url);
+const isLocalFile = (url: string) => url.startsWith('file:');
 
-	const [{ default: postgres }, { drizzle }] = await Promise.all([
-		import('postgres'),
-		import('drizzle-orm/postgres-js')
+async function openLibsql(url: string): Promise<Connection> {
+	rejectPostgres(url);
+	const [{ createClient }, { drizzle }] = await Promise.all([
+		import('@libsql/client'),
+		import('drizzle-orm/libsql')
 	]);
-	const client = postgres(url, {
-		// Transaction poolers (Supabase, PgBouncer) cannot reuse prepared statements.
-		prepare: false,
-		// Skip the type-OID lookup on connect; every column here is a built-in.
-		fetch_types: false,
-		max: maxConnections,
-		connect_timeout: 10
-	});
-	return {
-		db: drizzle(client, { schema }) as unknown as Database,
-		close: () => client.end({ timeout: 5 })
-	};
+	if (isLocalFile(url)) await ensureFolder(url);
+	const client = createClient({ url });
+	// D1 always enforces foreign keys; plain SQLite only when asked.
+	await client.execute('PRAGMA foreign_keys = ON');
+	if (isLocalFile(url)) {
+		// Another process may be writing (a seed script next to `npm run dev`).
+		await client.execute('PRAGMA busy_timeout = 5000');
+	}
+	const db = drizzle(client, { schema });
+	if (isLocalFile(url)) await migrateLocal(db);
+	return { db: db as unknown as Database, close: () => client.close() };
+}
+
+async function ensureFolder(url: string): Promise<void> {
+	const path = url.slice('file:'.length).split('?')[0]!;
+	if (!path || path === ':memory:') return;
+	const [{ mkdirSync }, { dirname }] = await Promise.all([import('node:fs'), import('node:path')]);
+	mkdirSync(dirname(path), { recursive: true });
 }
 
 /**
- * PGlite locks its data directory, so there must only ever be one per path —
- * even when Vite reloads this file during development. Kept on globalThis for that.
+ * A local SQLite file belongs to this one machine, so it is safe to bring its
+ * schema up to date on open: `npm run dev`, tests and the Docker image need no
+ * separate migrate step. D1 is migrated by `wrangler d1 migrations apply`.
  */
-const embedded = ((
-	globalThis as { __workLeaguePglite?: Map<string, Promise<Connection>> }
-).__workLeaguePglite ??= new Map());
-
-function openPglite(url: string): Promise<Connection> {
-	const existing = embedded.get(url);
-	if (existing) return existing;
-
-	const connecting = (async () => {
-		const [{ PGlite }, { drizzle }] = await Promise.all([
-			import('@electric-sql/pglite'),
-			import('drizzle-orm/pglite')
-		]);
-		// `pglite:<path>[?migrations=off]`; tests turn migrations off to build old schemas by hand.
-		const [path = '', query = ''] = url.slice('pglite:'.length).split('?');
-		const client = path === 'memory' || path === '' ? new PGlite() : new PGlite(path);
-		await client.waitReady;
-		const db = drizzle(client, { schema });
-		if (!new URLSearchParams(query).has('migrations', 'off')) await migrateEmbedded(db);
-		return {
-			db: db as unknown as Database,
-			close: async () => {
-				embedded.delete(url);
-				await client.close();
-			}
-		};
-	})();
-	embedded.set(url, connecting);
-	return connecting;
-}
-
-/**
- * An embedded database belongs to this one process, so it is safe to bring
- * its schema up to date on open: `npm run dev`, tests and the single-container
- * Docker image need no separate migrate step. Shared PostgreSQL servers are
- * migrated explicitly with `npm run db:migrate` instead.
- */
-async function migrateEmbedded(
-	db: Parameters<typeof import('drizzle-orm/pglite/migrator').migrate>[0]
-) {
+async function migrateLocal(
+	db: Parameters<typeof import('drizzle-orm/libsql/migrator').migrate>[0]
+): Promise<void> {
 	const [{ existsSync }, { resolve }, { migrate }] = await Promise.all([
 		import('node:fs'),
 		import('node:path'),
-		import('drizzle-orm/pglite/migrator')
+		import('drizzle-orm/libsql/migrator')
 	]);
 	const migrationsFolder = resolve(process.cwd(), 'drizzle');
 	if (existsSync(migrationsFolder)) await migrate(db, { migrationsFolder });
+}
+
+/** Wraps a Worker's D1 binding. Cheap, so it is done per request. */
+export async function openD1(binding: unknown): Promise<Database> {
+	const { drizzle } = await import('drizzle-orm/d1');
+	return drizzle(binding as AnyD1Database, { schema });
 }
 
 /* -------------------------------------------------------------------------- */
 /* Connection lifetime                                                         */
 /* -------------------------------------------------------------------------- */
 
-interface RequestScope {
-	readonly url: string;
-	connection?: Promise<Connection>;
-}
-
-/**
- * Cloudflare Workers forbid reusing a socket across requests ("Cannot perform
- * I/O on behalf of a different request"), so there every request gets its own
- * connection, held here. Under Node one long-lived pool is better.
- */
-const requestScope = new AsyncLocalStorage<RequestScope>();
+/** On Workers each request carries its own D1 binding; it is held here. */
+const requestDb = new AsyncLocalStorage<Promise<Database>>();
 
 let configuredUrl: string | undefined;
 let shared: Promise<Connection> | undefined;
 
 /**
- * Supplies the connection string from outside `process.env`, which is how
- * Cloudflare and SvelteKit's `$env` deliver it. Safe to call on every request.
+ * Supplies the database URL from outside `process.env`, which is how
+ * SvelteKit's `$env` delivers it. Safe to call on every request.
  */
 export function configureDatabase(url: string | undefined): void {
 	if (url && url !== configuredUrl) {
@@ -137,47 +118,33 @@ export function configureDatabase(url: string | undefined): void {
 }
 
 export function databaseUrl(): string | undefined {
-	return requestScope.getStore()?.url ?? configuredUrl ?? globalThis.process?.env?.DATABASE_URL;
+	return configuredUrl ?? globalThis.process?.env?.DATABASE_URL;
 }
 
-/**
- * Runs `fn` with a connection of its own, closed once it is done. Used on
- * Cloudflare, where a socket may not outlive the request that opened it.
- */
-export async function withRequestConnection<T>(
-	url: string | undefined,
-	fn: () => Promise<T>,
-	waitUntil?: (promise: Promise<unknown>) => void
-): Promise<T> {
-	if (!url) throw new DatabaseNotConfiguredError();
-	const scope: RequestScope = { url };
-	try {
-		return await requestScope.run(scope, fn);
-	} finally {
-		// The response body may still be streaming, so never block on this.
-		const closing = scope.connection?.then((c) => c.close());
-		if (closing) {
-			if (waitUntil) waitUntil(closing);
-			else closing.catch(() => {});
-		}
-	}
+/** Runs `fn` against a Worker's D1 binding. */
+export function withD1<T>(binding: unknown, fn: () => Promise<T>): Promise<T> {
+	if (!binding) throw new DatabaseNotConfiguredError();
+	return requestDb.run(openD1(binding), fn);
 }
 
 /**
  * The database for the current request. Connects on first use rather than on
- * import — `vite build` loads this file, and a build needs no credentials.
+ * import — `vite build` loads this file, and a build needs no database.
  */
 export async function getDb(): Promise<Database> {
-	const scope = requestScope.getStore();
-	if (scope) {
-		scope.connection ??= open(scope.url, 1);
-		return (await scope.connection).db;
-	}
+	const scoped = requestDb.getStore();
+	if (scoped) return scoped;
 
 	const url = databaseUrl();
 	if (!url) throw new DatabaseNotConfiguredError();
-	shared ??= open(url, 5);
-	return (await shared).db;
+	const opening = (shared ??= openLibsql(url));
+	try {
+		return (await opening).db;
+	} catch (error) {
+		// Let the next request try again rather than caching the failure.
+		if (shared === opening) shared = undefined;
+		throw error;
+	}
 }
 
 /** Closes the shared connection so one-off scripts and tests can exit. */
@@ -185,5 +152,5 @@ export async function closeDatabase(): Promise<void> {
 	const closing = shared;
 	shared = undefined;
 	configuredUrl = undefined;
-	await (await closing)?.close();
+	(await closing?.catch(() => undefined))?.close();
 }

@@ -33,18 +33,17 @@ clone it, host it for your office, make it yours.
   protects settings and deletions. Optionally, anyone can view the rankings read-only.
 - **Phone first.** Installable as an app, works with the screen on the table, keeps a live game
   safe on the device if the connection drops.
-- **Hosts anywhere.** Cloudflare Workers with any PostgreSQL, a single Docker container with an
-  embedded database, or Docker Compose with PostgreSQL.
+- **Hosts anywhere.** Cloudflare Workers with D1 (free tier friendly, nothing else to sign up
+  for), or a single Docker container or Node process with a SQLite file.
 
 ## Quick start (local)
 
-Needs Node 22.18 or newer. No database server required: development uses an embedded
-PostgreSQL ([PGlite](https://pglite.dev)) stored in `./.data`.
+Needs Node 22.18 or newer. No database server required: development uses a SQLite file in
+`./.data`, created and migrated on first use.
 
 ```sh
 cp .env.example .env      # set ADMIN_PASSWORD
 npm install
-npm run db:migrate
 npm run seed              # optional: demo players and matches for every game
 npm run dev
 ```
@@ -56,29 +55,37 @@ logo, colour and office passphrase.
 
 See [docs/self-hosting.md](docs/self-hosting.md) for the full guide. Summary:
 
-| Where                 | Database                                  | How                                                                                                       |
-| --------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Docker, one container | Embedded, in a volume                     | `docker run -p 3000:3000 -v league:/data -e ADMIN_PASSWORD=… -e ORIGIN=http://localhost:3000 work-league` |
-| Docker Compose        | PostgreSQL 17 container                   | `ADMIN_PASSWORD=… docker compose up -d`                                                                   |
-| Cloudflare Workers    | Any hosted PostgreSQL (Supabase, Neon, …) | `wrangler secret put DATABASE_URL`, `… ADMIN_PASSWORD`, `npm run deploy`                                  |
-| Any Node host         | Embedded or PostgreSQL                    | `npm run build:node && npm run db:migrate && npm start`                                                   |
+| Where                 | Database                        | How                                                                                                       |
+| --------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Cloudflare Workers    | D1, created on the first deploy | `npx wrangler d1 create work-league`, `npx wrangler secret put ADMIN_PASSWORD`, `npm run deploy`          |
+| Docker, one container | SQLite file in a volume         | `docker run -p 3000:3000 -v league:/data -e ADMIN_PASSWORD=… -e ORIGIN=http://localhost:3000 work-league` |
+| Docker Compose        | SQLite file in a volume         | `ADMIN_PASSWORD=… docker compose up -d`                                                                   |
+| Any Node host         | SQLite file (or Turso)          | `npm run build:node && npm run db:migrate && npm start`                                                   |
 
 ### Configuration
 
 Only a few things come from the environment. Everything else is set in the app at `/admin`.
 
-| Variable         | Required  | Purpose                                                                                 |
-| ---------------- | --------- | --------------------------------------------------------------------------------------- |
-| `DATABASE_URL`   | yes       | `postgres://…` for PostgreSQL, or `pglite:./path` for the embedded database (Node only) |
-| `ADMIN_PASSWORD` | for admin | Unlocks `/admin`. Without it, admin features stay off                                   |
-| `SESSION_SECRET` | no        | Signs cookies. If unset, a random one is generated and stored in the database           |
-| `ORIGIN`         | Node only | The public URL, e.g. `https://league.example.com`, so form submissions are accepted     |
+| Variable         | Required  | Purpose                                                                              |
+| ---------------- | --------- | ------------------------------------------------------------------------------------ |
+| `DATABASE_URL`   | Node only | `file:./path/league.db` for a SQLite file, or `libsql://…` for Turso. Workers use D1 |
+| `ADMIN_PASSWORD` | for admin | Unlocks `/admin`. Without it, admin features stay off                                |
+| `SESSION_SECRET` | no        | Signs cookies. If unset, a random one is generated and stored in the database        |
+| `ORIGIN`         | Node only | The public URL, e.g. `https://league.example.com`, so form submissions are accepted  |
 
-### Upgrading from the pool ladder (Open Pottr)
+### Moving from PostgreSQL (Work League 0.1 or the Open Pottr pool ladder)
 
-Back up first (`pg_dump`), then run `npm run db:migrate`. Migration `0001_game_modules` moves
-every existing match and rating into the new tables as pool matches. Nothing is recalculated, and a
-test proves a full replay gives the same ratings.
+Work League used to store its data in PostgreSQL. It now uses SQLite: Cloudflare D1, or a local
+file. One command copies a league across, from either the original pool ladder or Work League 0.1:
+
+```sh
+npm run import:postgres -- 'postgres://…'                         # writes work-league-import.sql
+npx wrangler d1 execute DB --remote --file=work-league-import.sql  # on a new, migrated D1
+```
+
+Every person, match and rating comes across unchanged (nothing is recalculated, and a test proves a
+full replay gives the same ratings), along with your settings. Upload your logo again at `/admin`.
+For a local SQLite file instead of D1, add `--apply` with `DATABASE_URL=file:…` set.
 
 ## How ratings work
 
@@ -121,16 +128,17 @@ gets rankings, history, profiles, championship points and theming automatically.
 npm run dev          # local development
 npm run check        # TypeScript and Svelte diagnostics
 npm run lint         # Prettier and ESLint
-npm test             # unit and database tests (in-memory PGlite)
+npm test             # unit and database tests (temporary SQLite files)
 npm run test:e2e     # browser smoke tests (Playwright)
 npm run build        # Cloudflare build; build:node for Node and Docker
 npm run db:generate  # write a migration after changing a schema file
-npm run db:migrate   # apply migrations
+npm run db:migrate   # apply migrations to DATABASE_URL (local files also migrate on start)
+npm run db:migrate:d1  # apply migrations to the Cloudflare D1 database
 npm run seed         # demo data in an empty database
 ```
 
-Stack: SvelteKit 2, Svelte 5, strict TypeScript, Drizzle ORM, PostgreSQL or PGlite, Valibot, and
-Material Color Utilities.
+Stack: SvelteKit 2, Svelte 5, strict TypeScript, Drizzle ORM on SQLite (Cloudflare D1 or libSQL),
+Valibot, and Material Color Utilities.
 
 ```text
 src/lib/

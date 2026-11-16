@@ -1,36 +1,15 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { sql } from 'drizzle-orm';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { closeDatabase, configureDatabase, getDb } from '../db/client';
 
-const DRIZZLE = resolve(import.meta.dirname, '../../../../drizzle');
-
-/** The SQL statements of one migration file, as drizzle-kit splits them. */
-export function migrationStatements(file: string): string[] {
-	return readFileSync(resolve(DRIZZLE, file), 'utf8')
-		.split('--> statement-breakpoint')
-		.map((s) => s.trim())
-		.filter(Boolean);
-}
-
-const MIGRATIONS = ['0000_init.sql', '0001_game_modules.sql'];
-
 /**
- * A fresh in-memory Postgres (PGlite) for one test file, migrated by running
- * the same SQL files production uses. Pass `until` to stop before a migration.
+ * A fresh SQLite database for a test, in its own temporary file, migrated with
+ * the same SQL files production uses.
  */
-export async function freshDatabase(until?: string) {
+export async function freshDatabase() {
 	await closeDatabase();
-	configureDatabase('pglite:memory?migrations=off');
-	const db = await getDb();
-	for (const file of MIGRATIONS) {
-		if (file === until) break;
-		for (const statement of migrationStatements(file)) await db.execute(sql.raw(statement));
-	}
-	return db;
-}
-
-export async function runMigration(file: string) {
-	const db = await getDb();
-	for (const statement of migrationStatements(file)) await db.execute(sql.raw(statement));
+	const folder = mkdtempSync(join(tmpdir(), 'work-league-test-'));
+	configureDatabase(`file:${join(folder, 'league.db')}`);
+	return getDb();
 }

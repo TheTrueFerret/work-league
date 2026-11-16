@@ -10,13 +10,13 @@ FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production \
 	PORT=3000 \
-	DATABASE_URL=pglite:/data/league
+	DATABASE_URL=file:/data/league.db
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
 COPY --from=build /app/drizzle ./drizzle
 COPY --from=build /app/scripts/migrate.ts ./scripts/migrate.ts
-# The embedded database lives here when DATABASE_URL is a pglite: path. A named
+# The SQLite database lives here. A named
 # volume mounted here inherits this ownership, so the node user can write to it.
 RUN mkdir -p /data && chown node:node /data
 VOLUME /data

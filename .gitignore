@@ -30,7 +30,8 @@ vite.config.ts.timestamp-*
 # Wrangler scratch
 .wrangler
 
-# Embedded PGlite databases (DATABASE_URL=pglite:./.data/…)
+# Local SQLite databases (DATABASE_URL=file:./.data/…), and Postgres import output
+/work-league-import.sql
 .data
 
 # Playwright

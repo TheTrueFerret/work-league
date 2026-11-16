@@ -23,8 +23,8 @@ export async function recordFailure(key: string, now = new Date()): Promise<void
 			target: loginAttempts.key,
 			set: {
 				// Start a fresh window once the old one has run out.
-				failures: sql`case when ${loginAttempts.windowStart} < ${expired} then 1 else ${loginAttempts.failures} + 1 end`,
-				windowStart: sql`case when ${loginAttempts.windowStart} < ${expired} then ${now} else ${loginAttempts.windowStart} end`
+				failures: sql`case when ${loginAttempts.windowStart} < ${expired.getTime()} then 1 else ${loginAttempts.failures} + 1 end`,
+				windowStart: sql`case when ${loginAttempts.windowStart} < ${expired.getTime()} then ${now.getTime()} else ${loginAttempts.windowStart} end`
 			}
 		});
 }

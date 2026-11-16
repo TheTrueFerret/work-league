@@ -4,7 +4,7 @@
 	"main": ".svelte-kit/cloudflare/_worker.js",
 	"compatibility_date": "2026-08-20",
 
-	// postgres.js needs node:net, node:tls and Buffer to reach the database.
+	// Buffer, for uploaded logos, and AsyncLocalStorage, for the per-request database.
 	"compatibility_flags": ["nodejs_compat"],
 
 	"assets": {
@@ -12,12 +12,22 @@
 		"directory": ".svelte-kit/cloudflare"
 	},
 
+	// The league's data. With no database_id, Wrangler uses the database with this
+	// name in your account, and creates it on the first deploy if there is none.
+	// Migrations come from ./drizzle: npm run db:migrate:d1
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "work-league",
+			"migrations_dir": "drizzle"
+		}
+	],
+
 	"observability": {
 		"enabled": true
 	},
 
 	// Secrets are set outside this file:
-	//   npx wrangler secret put DATABASE_URL     (a postgres:// URL; PGlite cannot run on Workers)
 	//   npx wrangler secret put ADMIN_PASSWORD
 	// Wrangler deletes dashboard variables on deploy unless told to keep them.
 	"keep_vars": true

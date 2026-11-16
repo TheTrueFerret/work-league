@@ -1,3 +1,4 @@
+import type { D1Database } from '@cloudflare/workers-types';
 import type { GameModule } from '$lib/modules/types';
 import type { ServerEnv } from '$lib/server/env';
 import type { Settings } from '$lib/server/repositories/settings';
@@ -25,6 +26,8 @@ declare global {
 		/** What Cloudflare hands each request. Absent under `vite dev` and Node. */
 		interface Platform {
 			env?: {
+				/** The league's D1 database, bound in wrangler.jsonc. */
+				DB?: D1Database;
 				DATABASE_URL?: string;
 				ADMIN_PASSWORD?: string;
 				SESSION_SECRET?: string;

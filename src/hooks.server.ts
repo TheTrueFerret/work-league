@@ -2,12 +2,7 @@ import { redirect, type Handle, type HandleServerError } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { installedModules } from '$lib/modules/registry';
 import { ADMIN_COOKIE, isValidAdmin, isValidMember, MEMBER_COOKIE } from '$lib/server/auth/session';
-import {
-	configureDatabase,
-	DatabaseNotConfiguredError,
-	isPglite,
-	withRequestConnection
-} from '$lib/server/db/client';
+import { configureDatabase, DatabaseNotConfiguredError, withD1 } from '$lib/server/db/client';
 import { readEnv } from '$lib/server/env';
 import { loadSettings, sessionSecret } from '$lib/server/repositories/settings';
 import { themeFor } from '$lib/server/theme';
@@ -23,23 +18,15 @@ const isPublic = (path: string) =>
 const onWorkers = globalThis.navigator?.userAgent === 'Cloudflare-Workers';
 
 /**
- * Cloudflare Workers get a connection per request (a socket may not outlive
- * it); Node keeps one shared pool and only needs the URL. An embedded PGlite
- * database is always shared: reopening it per request would lose its data.
+ * On Cloudflare Workers the database is the D1 binding each request carries.
+ * Everywhere else (Node, Docker, `vite dev`, tests) it is the libSQL database
+ * at DATABASE_URL, opened once and shared.
  */
 const database: Handle = async ({ event, resolve }) => {
 	event.locals.env = readEnv(event);
-	const url = event.locals.env.databaseUrl;
-
-	if (!onWorkers || (url && isPglite(url))) {
-		configureDatabase(url);
-		return resolve(event);
-	}
-	return withRequestConnection(
-		url,
-		async () => resolve(event),
-		(promise) => event.platform?.context?.waitUntil(promise)
-	);
+	if (onWorkers) return withD1(event.platform?.env?.DB, async () => resolve(event));
+	configureDatabase(event.locals.env.databaseUrl);
+	return resolve(event);
 };
 
 /** Loads settings and works out who is asking: visitor, member or admin. */
@@ -106,7 +93,9 @@ export const handle = sequence(database, access, theme);
 export const handleError: HandleServerError = ({ error }) => {
 	if (error instanceof DatabaseNotConfiguredError) {
 		console.error(error.message);
-		return { message: 'This Work League has no database yet. Set DATABASE_URL and restart it.' };
+		return {
+			message: 'This Work League has no database yet. See the README to connect one.'
+		};
 	}
 	console.error(error);
 	return { message: 'Something went wrong' };
