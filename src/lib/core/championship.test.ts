@@ -37,6 +37,20 @@ describe('office championship', () => {
 		});
 	});
 
+	it('counts an imported rating before the first match', () => {
+		const table = computeChampionship(
+			players,
+			[{ moduleId: 'pool', playerId: 1, rating: 1300, games: 0 }],
+			games
+		);
+		expect(table[0]).toMatchObject({ name: 'Ada', games: 0 });
+		expect(table[0]!.perGame.find((g) => g.moduleId === 'pool')).toMatchObject({
+			played: false,
+			rated: true,
+			rating: 1300
+		});
+	});
+
 	it('ignores games that are switched off', () => {
 		const table = computeChampionship(
 			players,

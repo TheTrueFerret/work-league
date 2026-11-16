@@ -8,8 +8,8 @@
 	let { data } = $props();
 
 	const game = $derived(findModule(page.params.game ?? '')!);
-	const ranked = $derived(data.players.filter((p) => p.games > 0));
-	const unranked = $derived(data.players.filter((p) => p.games === 0));
+	const ranked = $derived(data.players.filter((p) => p.ranked));
+	const unranked = $derived(data.players.filter((p) => !p.ranked));
 	const justRecorded = $derived(page.url.searchParams.has('recorded'));
 
 	const medal = ['🥇', '🥈', '🥉'];
@@ -55,7 +55,11 @@
 									>{/if}</span
 							>
 							<span class="sub">
-								<span class="num">{p.wins}W&thinsp;–&thinsp;{p.losses}L</span>
+								{#if p.games === 0}
+									<span>Imported rating, no matches yet</span>
+								{:else}
+									<span class="num">{p.wins}W&thinsp;–&thinsp;{p.losses}L</span>
+								{/if}
 								{#if streakLabel(p.streak)}
 									<span class="dot">·</span>
 									<span class:hot={p.streak > 0} class:cold={p.streak < 0}

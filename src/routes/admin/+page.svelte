@@ -3,6 +3,8 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { findModule } from '$lib/modules/registry';
+	import { parseRatingTable } from '$lib/core/rating-table';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { buildPalette, DEFAULT_SEED, isHexColour } from '$lib/theme/palette';
 	import { extractColours, loadImage, renderIcons } from '$lib/theme/logo';
 
@@ -49,6 +51,60 @@
 		if (image)
 			logoIcons = renderIcons(image, buildPalette(colour).light['--accent-soft'] ?? '#ffffff');
 	}
+
+	// Import ratings ------------------------------------------------------
+	// svelte-ignore state_referenced_locally
+	let importGame = $state(data.games[0]?.id ?? '');
+	let table = $state('');
+	const tablePlaceholder =
+		'Name,Elo\nAda,1200\nLinus,1050\n\n…or paste two columns from Excel or Google Sheets';
+	let importError = $state<string | null>(null);
+	const parsed = $derived(parseRatingTable(table));
+	const known = $derived(new Set(data.people.map((n) => n.toLowerCase())));
+	const newPeople = $derived(parsed.rows.filter((r) => !known.has(r.name.toLowerCase())).length);
+	const importGameName = $derived(data.games.find((g) => g.id === importGame)?.name ?? 'this game');
+	const imported = $derived(
+		form && 'saved' in form && form.saved === 'import' && 'imported' in form ? form : null
+	);
+
+	/** Spreadsheet programs on Windows often save CSV in Windows-1252, not UTF-8. */
+	function decode(bytes: ArrayBuffer): string {
+		try {
+			return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+		} catch {
+			return new TextDecoder('windows-1252').decode(bytes);
+		}
+	}
+
+	async function chooseTable(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		importError = null;
+		if (!file) return;
+		const bytes = await file.arrayBuffer();
+		const head = new Uint8Array(bytes.slice(0, 2));
+		// .xlsx and .ods files are zip archives, starting with "PK".
+		if (head[0] === 0x50 && head[1] === 0x4b) {
+			importError =
+				'That is a spreadsheet file. Save it as CSV first, or copy the two columns and paste them below.';
+			return;
+		}
+		table = decode(bytes);
+	}
+
+	const submitImport: SubmitFunction = () => {
+		importError = null;
+		return async ({ result, update }) => {
+			if (result.type === 'failure') {
+				importError = String(result.data?.error ?? 'That import did not work');
+				return;
+			}
+			await update({ reset: false });
+			if (result.type === 'success') table = '';
+			await invalidateAll();
+		};
+	};
 
 	const saved = $derived(form && 'saved' in form ? form.saved : null);
 	const refresh =
@@ -269,6 +325,87 @@
 			<button class="btn btn-danger">Remove passphrase</button>
 		</form>
 	{/if}
+</section>
+
+<!-- Import ratings ----------------------------------------------------- -->
+<section class="card block" aria-labelledby="import-heading">
+	<h2 id="import-heading">Import ratings</h2>
+	<p class="muted">
+		Already keep score somewhere else? Bring it in with two columns: each person's name and their
+		rating. Anyone not in the league yet is added.
+	</p>
+	<form method="POST" action="?/importRatings" class="fields" use:enhance={submitImport}>
+		<label>
+			<span>Game</span>
+			<select name="game" bind:value={importGame}>
+				{#each data.games as game (game.id)}
+					<option value={game.id}>{game.name}</option>
+				{/each}
+			</select>
+		</label>
+
+		<div class="import-label">
+			<label for="import-table">Names and ratings</label>
+			<label class="btn btn-tonal btn-small file">
+				Choose CSV file…
+				<input
+					type="file"
+					accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"
+					onchange={chooseTable}
+				/>
+			</label>
+		</div>
+		<textarea
+			id="import-table"
+			name="table"
+			bind:value={table}
+			rows="5"
+			spellcheck="false"
+			placeholder={tablePlaceholder}></textarea>
+
+		{#if parsed.rows.length}
+			<div class="preview-table">
+				<p class="preview-summary">
+					<strong>{parsed.rows.length} {parsed.rows.length === 1 ? 'person' : 'people'}</strong>
+					{#if newPeople}<span class="muted"> · {newPeople} new to the league</span>{/if}
+				</p>
+				<ul>
+					{#each parsed.rows as row (row.line)}
+						<li>
+							<span class="who"
+								>{row.name}{#if !known.has(row.name.toLowerCase())}<span class="pill">new</span
+									>{/if}</span
+							>
+							<span class="num">{row.rating}</span>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
+		{#if parsed.errors.length}
+			<ul class="import-errors" role="alert">
+				{#each parsed.errors as message (message)}<li>{message}</li>{/each}
+			</ul>
+		{/if}
+		{#if importError}<p class="error" role="alert">{importError}</p>{/if}
+
+		<p class="muted small">
+			Each rating becomes that person's starting point in {importGameName}. Results already recorded
+			are replayed on top, so the rankings update straight away. Importing again replaces the
+			earlier ratings.
+		</p>
+		<button
+			class="btn btn-primary"
+			disabled={!parsed.rows.length || parsed.errors.length > 0 || !importGame}
+			>Import {parsed.rows.length || ''} into {importGameName}</button
+		>
+		{#if imported}<p class="notice" role="status">
+				Imported {imported.imported}
+				{imported.imported === 1 ? 'rating' : 'ratings'} into {imported.game}{imported.added
+					? `, and added ${imported.added} ${imported.added === 1 ? 'person' : 'people'} to the league`
+					: ''}.
+			</p>{/if}
+	</form>
 </section>
 
 <!-- Data --------------------------------------------------------------- -->
@@ -517,8 +654,82 @@
 		margin: 0;
 	}
 
-	.block > .btn {
+	.block > .btn,
+	.fields > .btn {
 		align-self: flex-start;
+	}
+
+	.import-label {
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: -0.5rem;
+	}
+
+	.import-label > label:first-child {
+		font-size: 0.85rem;
+		font-weight: 600;
+	}
+
+	.btn-small {
+		padding: 0.35rem 0.8rem;
+		font-size: 0.8rem;
+	}
+
+	.file {
+		position: relative;
+	}
+
+	textarea {
+		font-family: ui-monospace, monospace;
+		font-size: 0.85rem;
+	}
+
+	.preview-table {
+		background: var(--surface-2);
+		border-radius: var(--r-md);
+	}
+
+	.preview-summary {
+		margin: 0;
+		padding: 0.6rem 0.75rem;
+		font-size: 0.85rem;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.preview-table ul {
+		max-height: 14rem;
+		margin: 0;
+		padding: 0.25rem 0;
+		overflow-y: auto;
+		list-style: none;
+	}
+
+	.preview-table li {
+		display: flex;
+		gap: 0.75rem;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.3rem 0.75rem;
+		font-size: 0.85rem;
+	}
+
+	.preview-table .who {
+		display: flex;
+		gap: 0.4rem;
+		align-items: center;
+		min-width: 0;
+		overflow-wrap: anywhere;
+	}
+
+	.import-errors {
+		margin: 0;
+		padding: 0.6rem 0.9rem 0.6rem 1.9rem;
+		color: var(--loss);
+		background: color-mix(in oklab, var(--loss-soft) 60%, transparent);
+		border-radius: var(--r-md);
+		font-size: 0.85rem;
 	}
 
 	@media (max-width: 30rem) {

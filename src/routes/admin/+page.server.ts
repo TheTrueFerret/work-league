@@ -1,7 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 import * as v from 'valibot';
 import { UserError } from '$lib/core/errors';
-import { installedModules } from '$lib/modules/registry';
+import { parseRatingTable } from '$lib/core/rating-table';
+import { findModule, installedModules } from '$lib/modules/registry';
 import { hashSecret } from '$lib/server/auth/crypto';
 import { ADMIN_COOKIE } from '$lib/server/auth/session';
 import { attempt, formFlag, readForm, requireAdmin } from '$lib/server/forms';
@@ -13,13 +14,18 @@ import {
 	saveBrandAssets,
 	type BrandAssetKey
 } from '$lib/server/repositories/brand-assets';
+import { importRatings } from '$lib/server/repositories/matches';
+import { listPlayers } from '$lib/server/repositories/players';
 import { loadSettings, saveSetting } from '$lib/server/repositories/settings';
 import { isHexColour } from '$lib/theme/palette';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = ({ locals }) => {
+export const load: PageServerLoad = async ({ locals }) => {
 	const { settings } = locals;
 	return {
+		/** For the import preview, which marks who is new. */
+		people: (await listPlayers()).map((p) => p.name),
+		games: locals.games.map((g) => ({ id: g.id, name: g.name, start: g.rating.start })),
 		settings: {
 			branding: settings.branding,
 			disabled: settings.modules.disabled,
@@ -139,6 +145,22 @@ export const actions: Actions = {
 		const { publicRead } = await readForm(request, v.object({ publicRead: formFlag }));
 		await saveSetting('access', { ...locals.settings.access, publicRead });
 		return { saved: 'access' };
+	}),
+
+	importRatings: adminAction(async ({ request }) => {
+		const form = await readForm(
+			request,
+			v.object({
+				game: v.string(),
+				table: v.pipe(v.string(), v.maxLength(200_000, 'That file is too large'))
+			})
+		);
+		const game = findModule(form.game);
+		if (!game) throw new UserError('Pick a game to import into');
+		const { rows, errors } = parseRatingTable(form.table);
+		if (errors.length) throw new UserError(errors[0]!);
+		const result = await importRatings(game, rows);
+		return { saved: 'import', game: game.name, ...result };
 	}),
 
 	logout: async ({ cookies }) => {
