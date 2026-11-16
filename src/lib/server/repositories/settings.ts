@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import * as v from 'valibot';
 import { DEFAULT_SEED, isHexColour } from '$lib/theme/palette';
 import { getDb } from '../db/client';
@@ -105,7 +105,7 @@ export async function saveSetting<K extends Exclude<Key, 'secret'>>(
 	await db
 		.insert(settings)
 		.values({ key, value: clean })
-		.onConflictDoUpdate({ target: settings.key, set: { value: clean, updatedAt: sql`now()` } });
+		.onConflictDoUpdate({ target: settings.key, set: { value: clean, updatedAt: new Date() } });
 	cached = undefined;
 }
 

@@ -7,12 +7,11 @@ Thanks for helping. Work League is meant to be easy to host and easy to extend.
 ```sh
 cp .env.example .env
 npm install
-npm run db:migrate
 npm run seed
 npm run dev
 ```
 
-The default `.env` uses an embedded database in `./.data`, so you don't need a database server.
+The default `.env` uses a SQLite file in `./.data`, so you don't need a database server.
 
 ## Before opening a pull request
 
@@ -25,7 +24,10 @@ npm test         # unit and database tests
 - New games: follow [docs/writing-a-module.md](docs/writing-a-module.md). Keep game rules pure and
   tested.
 - Schema changes: edit the schema, run `npm run db:generate`, and commit the migration. Never edit
-  a migration that has been released.
+  a migration that has been released. The same SQL runs on D1 and on local SQLite files.
+- Database writes: D1 has no interactive transactions, so never call `db.transaction()`. Make
+  related writes atomic with `db.batch([...])`, and keep each statement under 100 bound
+  parameters (D1's limit). See `src/lib/server/repositories/matches.ts`.
 - UI changes: check a phone width (360px) and dark mode, and include screenshots in the PR.
 - Keep the footer credit and its link.
 

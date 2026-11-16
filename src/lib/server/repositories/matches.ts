@@ -1,18 +1,19 @@
-import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
+import type { BatchItem } from 'drizzle-orm/batch';
 import * as v from 'valibot';
 import { UserError } from '$lib/core/errors';
 import { computeDeltas, type Competitor } from '$lib/core/rating/elo';
 import { advanceStanding, blankStanding, type Standing } from '$lib/core/standing';
 import type { GameModule, MatchSubmission } from '$lib/modules/types';
 import { getDb, type Database } from '../db/client';
-import { matches, matchPlayers, players, ratings } from '../db/schema';
+import { gameVersions, matches, matchPlayers, players, ratings } from '../db/schema';
 
-/** Postgres caps a statement at 65535 parameters, so write in batches. */
-const CHUNK = 500;
+/** D1 accepts at most 100 bound parameters in one statement. */
+const MAX_PARAMS = 100;
 
-function chunked<T>(items: readonly T[]): T[][] {
+function chunked<T>(items: readonly T[], size: number): T[][] {
 	const out: T[][] = [];
-	for (let i = 0; i < items.length; i += CHUNK) out.push(items.slice(i, i + CHUNK));
+	for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
 	return out;
 }
 
@@ -50,16 +51,68 @@ function parseDetails<Details>(module: GameModule<Details>, raw: unknown): Detai
 	return result.output;
 }
 
-/** Serialises every write to one game's ratings until the transaction ends. */
-async function lockGame(db: Database, moduleId: string): Promise<void> {
-	await db.execute(sql`select pg_advisory_xact_lock(hashtext(${'work-league:' + moduleId}))`);
+/* -------------------------------------------------------------------------- */
+/* Writing safely without transactions                                         */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * D1 cannot hold a transaction open while the app reads, thinks and writes; it
+ * only runs a batch of statements atomically. So every write to a game's
+ * ratings reads that game's version first, does its sums, then sends one batch
+ * that starts by moving the version on. If another write moved it in the
+ * meantime, that first statement fails, the whole batch rolls back, and the
+ * write starts over from fresh data.
+ */
+
+type Batch = [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]];
+
+async function readVersion(db: Database, moduleId: string): Promise<number> {
+	await db.insert(gameVersions).values({ moduleId }).onConflictDoNothing();
+	const [row] = await db
+		.select({ version: gameVersions.version })
+		.from(gameVersions)
+		.where(eq(gameVersions.moduleId, moduleId));
+	return row?.version ?? 0;
+}
+
+/**
+ * Moves the version on, or sets it to NULL when it is no longer `seen`. The
+ * NOT NULL constraint rejects that, which aborts and rolls back the batch.
+ */
+function claimVersion(db: Database, moduleId: string, seen: number) {
+	return db
+		.update(gameVersions)
+		.set({
+			version: sql`case when ${gameVersions.version} = ${seen} then ${gameVersions.version} + 1 end`
+		})
+		.where(eq(gameVersions.moduleId, moduleId));
+}
+
+function isVersionConflict(error: unknown): boolean {
+	for (let e = error; e instanceof Error; e = e.cause) {
+		if (e.message.includes('game_versions.version')) return true;
+	}
+	return false;
+}
+
+/** Retries `write` while another write to the same game keeps getting there first. */
+async function retrying<T>(write: () => Promise<T>): Promise<T> {
+	for (let attempt = 1; ; attempt++) {
+		try {
+			return await write();
+		} catch (error) {
+			if (!isVersionConflict(error) || attempt >= 8) throw error;
+			await new Promise((done) => setTimeout(done, Math.random() * 20 * attempt));
+		}
+	}
 }
 
 const toRow = (moduleId: string, s: Standing): typeof ratings.$inferInsert => ({ moduleId, ...s });
+const RATING_ROWS = Math.floor(MAX_PARAMS / 10);
 
-async function writeStandings(db: Database, moduleId: string, rows: readonly Standing[]) {
-	for (const batch of chunked(rows)) {
-		await db
+function upsertStandings(db: Database, moduleId: string, rows: readonly Standing[]) {
+	return chunked(rows, RATING_ROWS).map((batch) =>
+		db
 			.insert(ratings)
 			.values(batch.map((s) => toRow(moduleId, s)))
 			.onConflictDoUpdate({
@@ -74,12 +127,16 @@ async function writeStandings(db: Database, moduleId: string, rows: readonly Sta
 					form: sql`excluded.form`,
 					lastPlayed: sql`excluded.last_played`
 				}
-			});
-	}
+			})
+	);
 }
 
+/* -------------------------------------------------------------------------- */
+/* Recording, deleting, replaying                                              */
+/* -------------------------------------------------------------------------- */
+
 /**
- * Validates a result, rates it and saves it in one transaction.
+ * Validates a result, rates it and saves it in one atomic batch.
  *
  * A new match is always the most recent one, so nothing before it changes and
  * standings are updated in place rather than replayed.
@@ -99,26 +156,19 @@ export async function recordMatch<Details>(
 	const ids = sides.flat();
 	const db = await getDb();
 
-	return db.transaction(async (tx) => {
-		await lockGame(tx, module.id);
-		const known = await tx
+	return retrying(async () => {
+		const version = await readVersion(db, module.id);
+		const known = await db
 			.select({ id: players.id, active: players.active })
 			.from(players)
 			.where(inArray(players.id, ids));
 		if (known.length !== ids.length) throw new UserError('Unknown player');
 		if (known.some((p) => !p.active)) throw new UserError('Archived players cannot play');
 
-		// Make sure every player has a row to lock, then lock them so two results
-		// recorded at the same moment cannot both start from the same rating.
-		await tx
-			.insert(ratings)
-			.values(ids.map((id) => toRow(module.id, blankStanding(id, module.rating.start))))
-			.onConflictDoNothing();
-		const current = await tx
+		const current = await db
 			.select()
 			.from(ratings)
-			.where(and(eq(ratings.moduleId, module.id), inArray(ratings.playerId, ids)))
-			.for('update');
+			.where(and(eq(ratings.moduleId, module.id), inArray(ratings.playerId, ids)));
 		const before = new Map<number, Standing>(current.map((row) => [row.playerId, row]));
 		const standingOf = (id: number): Standing =>
 			before.get(id) ?? blankStanding(id, module.rating.start);
@@ -127,16 +177,12 @@ export async function recordMatch<Details>(
 			side.map((id) => ({ id, rating: standingOf(id).rating, games: standingOf(id).games }))
 		);
 		const deltas = computeDeltas(competitors, placements, module.rating);
-
-		const [match] = await tx
-			.insert(matches)
-			.values({ moduleId: module.id, note, details: details as unknown })
-			.returning({ id: matches.id, playedAt: matches.playedAt });
-		if (!match) throw new Error('Insert returned no row');
+		const playedAt = new Date();
 
 		const lines = sides.flatMap((side, sideIndex) =>
 			side.map((playerId) => ({
-				matchId: match.id,
+				// The match row inserted just before, in the same atomic batch.
+				matchId: sql`(select max(${matches.id}) from ${matches})`,
 				playerId,
 				side: sideIndex,
 				placement: placements[sideIndex]!,
@@ -144,14 +190,23 @@ export async function recordMatch<Details>(
 				delta: deltas.get(playerId) ?? 0
 			}))
 		);
-		await tx.insert(matchPlayers).values(lines);
-		await writeStandings(
-			tx,
-			module.id,
-			lines.map((l) =>
-				advanceStanding(standingOf(l.playerId), l.placement === 1, l.delta, match.playedAt)
-			)
+		const standings = lines.map((l) =>
+			advanceStanding(standingOf(l.playerId), l.placement === 1, l.delta, playedAt)
 		);
+
+		const [, inserted] = await db.batch([
+			claimVersion(db, module.id, version),
+			db
+				.insert(matches)
+				.values({ moduleId: module.id, playedAt, note, details: details as unknown })
+				.returning({ id: matches.id }),
+			...chunked(lines, Math.floor(MAX_PARAMS / 5)).map((batch) =>
+				db.insert(matchPlayers).values(batch)
+			),
+			...upsertStandings(db, module.id, standings)
+		] as unknown as Batch);
+		const match = (inserted as { id: number }[])[0];
+		if (!match) throw new Error('Insert returned no row');
 		return match.id;
 	});
 }
@@ -162,30 +217,55 @@ export async function deleteMatch(
 	modules: (moduleId: string) => GameModule | undefined
 ): Promise<void> {
 	const db = await getDb();
-	await db.transaction(async (tx) => {
-		const [match] = await tx
-			.delete(matches)
-			.where(eq(matches.id, id))
-			.returning({ moduleId: matches.moduleId });
+	await retrying(async () => {
+		const [match] = await db
+			.select({ moduleId: matches.moduleId })
+			.from(matches)
+			.where(eq(matches.id, id));
 		if (!match) throw new UserError('That match no longer exists');
+		const removal = [
+			db.delete(matchPlayers).where(eq(matchPlayers.matchId, id)),
+			db.delete(matches).where(eq(matches.id, id))
+		];
+
 		const module = modules(match.moduleId);
-		if (module) await replayModule(tx, module);
+		// A match from an uninstalled game has no ratings to keep in step.
+		if (!module) return void (await db.batch(removal as unknown as Batch));
+
+		const version = await readVersion(db, module.id);
+		const replay = await planReplay(db, module, id);
+		await db.batch([claimVersion(db, module.id, version), ...removal, ...replay] as Batch);
 	});
 }
 
 /** Rebuilds every rating in one game from its match history. */
 export async function rebuildRatings(module: GameModule): Promise<void> {
 	const db = await getDb();
-	await db.transaction((tx) => replayModule(tx, module));
+	await retrying(async () => {
+		const version = await readVersion(db, module.id);
+		const replay = await planReplay(db, module);
+		await db.batch([claimVersion(db, module.id, version), ...replay] as Batch);
+	});
 }
+
+/** Rows per `update match_players` statement. The values are inlined integers, not parameters. */
+const UPDATE_ROWS = 1000;
+
+const int = (n: number): number => {
+	if (!Number.isSafeInteger(n)) throw new Error(`Expected an integer, got ${n}`);
+	return n;
+};
 
 /**
  * Ratings are path-dependent, so removing an old match invalidates everything
- * that followed it. This replays the whole history of one game.
+ * that followed it. This replays the whole history of one game, leaving out
+ * `withoutMatch` if given, and returns the statements that store the result.
  */
-async function replayModule(db: Database, module: GameModule): Promise<void> {
-	await lockGame(db, module.id);
-
+async function planReplay(
+	db: Database,
+	module: GameModule,
+	withoutMatch?: number
+): Promise<BatchItem<'sqlite'>[]> {
 	const rows = await db
 		.select({
 			matchId: matchPlayers.matchId,
@@ -202,7 +282,8 @@ async function replayModule(db: Database, module: GameModule): Promise<void> {
 			asc(matches.id),
 			asc(matchPlayers.side),
 			asc(matchPlayers.playerId)
-		);
+		)
+		.then((all) => all.filter((r) => r.matchId !== withoutMatch));
 
 	const state = new Map<number, Standing>();
 	const standingOf = (id: number): Standing =>
@@ -244,23 +325,26 @@ async function replayModule(db: Database, module: GameModule): Promise<void> {
 		}
 	}
 
-	for (const batch of chunked(updates)) {
-		await db.execute(sql`
-			update match_players as mp
+	const statements: BatchItem<'sqlite'>[] = chunked(updates, UPDATE_ROWS).map((batch) => {
+		// Inlined because D1 allows only 100 parameters a statement; `int` makes this safe.
+		const values: SQL = sql.raw(
+			batch
+				.map(
+					(u) => `(${int(u.matchId)}, ${int(u.playerId)}, ${int(u.ratingBefore)}, ${int(u.delta)})`
+				)
+				.join(', ')
+		);
+		return db.run(sql`
+			with u(match_id, player_id, rating_before, delta) as (values ${values})
+			update match_players
 			set rating_before = u.rating_before, delta = u.delta
-			from (values ${sql.join(
-				batch.map(
-					(u) =>
-						sql`(${u.matchId}::int, ${u.playerId}::int, ${u.ratingBefore}::int, ${u.delta}::int)`
-				),
-				sql`, `
-			)}) as u(match_id, player_id, rating_before, delta)
-			where mp.match_id = u.match_id and mp.player_id = u.player_id
+			from u
+			where match_players.match_id = u.match_id and match_players.player_id = u.player_id
 		`);
-	}
-
-	await db.delete(ratings).where(eq(ratings.moduleId, module.id));
-	await writeStandings(db, module.id, [...state.values()]);
+	});
+	statements.push(db.delete(ratings).where(eq(ratings.moduleId, module.id)));
+	statements.push(...upsertStandings(db, module.id, [...state.values()]));
+	return statements;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -366,8 +450,11 @@ export interface HistoryMatch {
 
 type MatchLine = HistoryLine & { matchId: number };
 
-async function linesFor(matchIds: number[]): Promise<MatchLine[]> {
-	if (!matchIds.length) return [];
+/**
+ * Everyone who played in the matches `matchIds` selects. Takes a subquery, not
+ * a list, because D1 allows only 100 parameters a statement.
+ */
+async function linesFor(matchIds: SQLWrapper): Promise<MatchLine[]> {
 	const db = await getDb();
 	return db
 		.select({
@@ -400,20 +487,30 @@ function groupSides(lines: readonly HistoryLine[]): HistoryMatch['sides'] {
 /** Recent matches in one game, newest first, with each player's rating change. */
 export async function history(module: GameModule, limit = 100): Promise<HistoryMatch[]> {
 	const db = await getDb();
-	const recent = await db
-		.select({
-			id: matches.id,
-			moduleId: matches.moduleId,
-			playedAt: matches.playedAt,
-			note: matches.note,
-			details: matches.details
-		})
-		.from(matches)
-		.where(eq(matches.moduleId, module.id))
-		.orderBy(desc(matches.playedAt), desc(matches.id))
-		.limit(limit);
-
-	const lines = await linesFor(recent.map((m) => m.id));
+	const inGame = eq(matches.moduleId, module.id);
+	const order = [desc(matches.playedAt), desc(matches.id)];
+	const [recent, lines] = await Promise.all([
+		db
+			.select({
+				id: matches.id,
+				moduleId: matches.moduleId,
+				playedAt: matches.playedAt,
+				note: matches.note,
+				details: matches.details
+			})
+			.from(matches)
+			.where(inGame)
+			.orderBy(...order)
+			.limit(limit),
+		linesFor(
+			db
+				.select({ id: matches.id })
+				.from(matches)
+				.where(inGame)
+				.orderBy(...order)
+				.limit(limit)
+		)
+	]);
 	return recent.map((m) => ({
 		id: m.id,
 		moduleId: m.moduleId,
@@ -453,6 +550,7 @@ export async function allStandings(): Promise<GameStanding[]> {
 
 export async function playerGameProfile(module: GameModule, playerId: number) {
 	const db = await getDb();
+	const mine = and(eq(matchPlayers.playerId, playerId), eq(matches.moduleId, module.id));
 	const played = await db
 		.select({
 			id: matches.id,
@@ -465,10 +563,16 @@ export async function playerGameProfile(module: GameModule, playerId: number) {
 		})
 		.from(matchPlayers)
 		.innerJoin(matches, eq(matches.id, matchPlayers.matchId))
-		.where(and(eq(matchPlayers.playerId, playerId), eq(matches.moduleId, module.id)))
+		.where(mine)
 		.orderBy(asc(matches.playedAt), asc(matches.id));
 
-	const everyone = await linesFor(played.map((m) => m.id));
+	const everyone = await linesFor(
+		db
+			.select({ id: matchPlayers.matchId })
+			.from(matchPlayers)
+			.innerJoin(matches, eq(matches.id, matchPlayers.matchId))
+			.where(mine)
+	);
 	const linesByMatch = new Map<number, HistoryLine[]>();
 	for (const line of everyone) {
 		const list = linesByMatch.get(line.matchId) ?? [];

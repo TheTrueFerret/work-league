@@ -108,8 +108,10 @@ card, profiles get a tab, and the championship gets a column. Admins can switch 
 ## Module-specific tables
 
 Most games fit in `details`. If yours needs its own tables, put them in
-`src/lib/modules/<id>/server/schema.ts`, prefix table names with the module id, and run
-`npm run db:generate` to create a migration.
+`src/lib/modules/<id>/server/schema.ts` with Drizzle's `sqlite-core`, prefix table names with the
+module id, and run `npm run db:generate` to create a migration. The same migration runs on
+Cloudflare D1 and on local SQLite files. D1 has no interactive transactions: group writes that
+belong together in `db.batch([...])`.
 
 ## Checklist
 

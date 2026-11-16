@@ -9,11 +9,11 @@ import { defineConfig, loadEnv } from 'vite';
  */
 const target = process.env.WORK_LEAGUE_ADAPTER === 'node' ? 'node' : 'cloudflare';
 
-/** PGlite cannot run on Workers; a stub keeps it, and its weight, out of the Worker. */
-const stub = '/src/lib/server/db/pglite-unavailable.ts';
-const withoutPglite = [
-	{ find: /^@electric-sql\/pglite$/, replacement: stub },
-	{ find: /^drizzle-orm\/pglite(\/migrator)?$/, replacement: stub }
+/** Workers use the D1 binding; a stub keeps the native libSQL driver out of the Worker. */
+const stub = '/src/lib/server/db/libsql-unavailable.ts';
+const withoutLibsql = [
+	{ find: /^@libsql\/client$/, replacement: stub },
+	{ find: /^drizzle-orm\/libsql(\/migrator)?$/, replacement: stub }
 ];
 
 export default defineConfig(({ command, mode }) => {
@@ -33,7 +33,7 @@ export default defineConfig(({ command, mode }) => {
 			})
 		],
 		resolve: {
-			alias: command === 'build' && target === 'cloudflare' ? withoutPglite : []
+			alias: command === 'build' && target === 'cloudflare' ? withoutLibsql : []
 		},
 		ssr: {
 			// Its published ESM has an import without a file extension, which Node

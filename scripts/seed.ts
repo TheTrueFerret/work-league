@@ -8,7 +8,7 @@ import { installedModules } from '$lib/modules/registry';
 import type { GameModule } from '$lib/modules/types';
 import { closeDatabase, getDb } from '$lib/server/db/client';
 import { matches } from '$lib/server/db/schema';
-import { recordMatch } from '$lib/server/repositories/matches';
+import { rebuildRatings, recordMatch } from '$lib/server/repositories/matches';
 import { addPlayer, listPlayers } from '$lib/server/repositories/players';
 import { demoMatch } from './seed-games';
 
@@ -49,6 +49,9 @@ for (const game of installedModules) {
 		await db.update(matches).set({ playedAt }).where(eq(matches.id, id));
 	}
 }
+
+// Backdating moved every match, so bring "last played" and friends in line with it.
+for (const game of installedModules) await rebuildRatings(game);
 
 console.log(
 	`Seeded ${ids.size} people and ${recorded} matches across ${installedModules.length} games.`

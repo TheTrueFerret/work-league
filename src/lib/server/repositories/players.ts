@@ -1,4 +1,4 @@
-import { and, count, eq, ne, sql } from 'drizzle-orm';
+import { and, count, eq, exists, ne, not, sql } from 'drizzle-orm';
 import { UserError } from '$lib/core/errors';
 import { getDb } from '../db/client';
 import { matchPlayers, players } from '../db/schema';
@@ -78,14 +78,24 @@ export async function setPlayerActive(id: number, active: boolean): Promise<void
 
 export async function deletePlayer(id: number): Promise<void> {
 	const db = await getDb();
-	await db.transaction(async (tx) => {
-		const [played] = await tx
-			.select({ n: count() })
-			.from(matchPlayers)
-			.where(eq(matchPlayers.playerId, id));
-		if (played && played.n > 0) {
-			throw new UserError('That player has matches on record. Archive them instead.');
-		}
-		await tx.delete(players).where(eq(players.id, id));
-	});
+	const [played] = await db
+		.select({ n: count() })
+		.from(matchPlayers)
+		.where(eq(matchPlayers.playerId, id));
+	if (played && played.n > 0) {
+		throw new UserError('That player has matches on record. Archive them instead.');
+	}
+	// Checked again in the same statement, in case a result was recorded in between.
+	const deleted = await db
+		.delete(players)
+		.where(
+			and(
+				eq(players.id, id),
+				not(exists(db.select().from(matchPlayers).where(eq(matchPlayers.playerId, id))))
+			)
+		)
+		.returning({ id: players.id });
+	if (!deleted.length && (await getPlayer(id))) {
+		throw new UserError('That player has matches on record. Archive them instead.');
+	}
 }

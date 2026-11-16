@@ -28,14 +28,16 @@ export async function saveBrandAssets(
 	assets: ReadonlyMap<BrandAssetKey, Uint8Array>
 ): Promise<void> {
 	const db = await getDb();
-	await db.transaction(async (tx) => {
-		for (const [key, data] of assets) {
-			await tx
-				.insert(brandAssets)
-				.values({ key, contentType: 'image/png', data })
-				.onConflictDoUpdate({ target: brandAssets.key, set: { data, updatedAt: new Date() } });
-		}
+	const writes = [...assets].map(([key, bytes]) => {
+		const data = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+		return db
+			.insert(brandAssets)
+			.values({ key, contentType: 'image/png', data })
+			.onConflictDoUpdate({ target: brandAssets.key, set: { data, updatedAt: new Date() } });
 	});
+	const [first, ...rest] = writes;
+	// All icons change together or not at all.
+	if (first) await db.batch([first, ...rest]);
 }
 
 export async function clearBrandAssets(): Promise<void> {

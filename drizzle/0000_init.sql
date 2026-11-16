@@ -1,42 +1,68 @@
-CREATE TYPE "public"."team_side" AS ENUM('A', 'B');--> statement-breakpoint
-CREATE TABLE "matches" (
-	"id" serial PRIMARY KEY NOT NULL,
-	"played_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"note" text
+CREATE TABLE `brand_assets` (
+	`key` text PRIMARY KEY NOT NULL,
+	`content_type` text NOT NULL,
+	`data` blob NOT NULL,
+	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "participants" (
-	"match_id" integer NOT NULL,
-	"player_id" integer NOT NULL,
-	"team" "team_side" NOT NULL,
-	"won" boolean NOT NULL,
-	"rating_before" integer DEFAULT 1000 NOT NULL,
-	"delta" integer DEFAULT 0 NOT NULL,
-	CONSTRAINT "participants_match_id_player_id_pk" PRIMARY KEY("match_id","player_id")
+CREATE TABLE `game_versions` (
+	`module_id` text PRIMARY KEY NOT NULL,
+	`version` integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "players" (
-	"id" serial PRIMARY KEY NOT NULL,
-	"name" text NOT NULL,
-	"active" boolean DEFAULT true NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+CREATE TABLE `login_attempts` (
+	`key` text PRIMARY KEY NOT NULL,
+	`failures` integer DEFAULT 0 NOT NULL,
+	`window_start` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "standings" (
-	"player_id" integer PRIMARY KEY NOT NULL,
-	"rating" integer DEFAULT 1000 NOT NULL,
-	"games" integer DEFAULT 0 NOT NULL,
-	"wins" integer DEFAULT 0 NOT NULL,
-	"losses" integer DEFAULT 0 NOT NULL,
-	"peak" integer DEFAULT 1000 NOT NULL,
-	"streak" integer DEFAULT 0 NOT NULL,
-	"form" text DEFAULT '' NOT NULL,
-	"last_played" timestamp with time zone
+CREATE TABLE `match_players` (
+	`match_id` integer NOT NULL,
+	`player_id` integer NOT NULL,
+	`side` integer NOT NULL,
+	`placement` integer NOT NULL,
+	`rating_before` integer NOT NULL,
+	`delta` integer DEFAULT 0 NOT NULL,
+	PRIMARY KEY(`match_id`, `player_id`),
+	FOREIGN KEY (`match_id`) REFERENCES `matches`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`player_id`) REFERENCES `players`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-ALTER TABLE "participants" ADD CONSTRAINT "participants_match_id_matches_id_fk" FOREIGN KEY ("match_id") REFERENCES "public"."matches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "participants" ADD CONSTRAINT "participants_player_id_players_id_fk" FOREIGN KEY ("player_id") REFERENCES "public"."players"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "standings" ADD CONSTRAINT "standings_player_id_players_id_fk" FOREIGN KEY ("player_id") REFERENCES "public"."players"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "matches_played_at" ON "matches" USING btree ("played_at" DESC NULLS LAST,"id" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "participants_player" ON "participants" USING btree ("player_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "players_name_unique" ON "players" USING btree (lower("name"));
+CREATE INDEX `match_players_player` ON `match_players` (`player_id`);--> statement-breakpoint
+CREATE TABLE `matches` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`module_id` text NOT NULL,
+	`played_at` integer NOT NULL,
+	`note` text,
+	`details` text DEFAULT '{}' NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX `matches_module_played_at` ON `matches` (`module_id`,`played_at`,`id`);--> statement-breakpoint
+CREATE TABLE `players` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`name` text NOT NULL,
+	`active` integer DEFAULT true NOT NULL,
+	`created_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `players_name_unique` ON `players` (lower("name"));--> statement-breakpoint
+CREATE TABLE `ratings` (
+	`module_id` text NOT NULL,
+	`player_id` integer NOT NULL,
+	`rating` integer NOT NULL,
+	`games` integer DEFAULT 0 NOT NULL,
+	`wins` integer DEFAULT 0 NOT NULL,
+	`losses` integer DEFAULT 0 NOT NULL,
+	`peak` integer NOT NULL,
+	`streak` integer DEFAULT 0 NOT NULL,
+	`form` text DEFAULT '' NOT NULL,
+	`last_played` integer,
+	PRIMARY KEY(`module_id`, `player_id`),
+	FOREIGN KEY (`player_id`) REFERENCES `players`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE TABLE `settings` (
+	`key` text PRIMARY KEY NOT NULL,
+	`value` text NOT NULL,
+	`updated_at` integer NOT NULL
+);
