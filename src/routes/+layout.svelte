@@ -57,11 +57,22 @@
 			{#if game}
 				<span class="context"><span aria-hidden="true">/</span> {game.name}</span>
 			{/if}
-			{#if data.readOnly && data.passphraseSet}
-				<a class="unlock" href="/unlock?next={encodeURIComponent(page.url.pathname)}">
-					<Icon name="lock" size="0.95rem" /> Unlock
-				</a>
-			{/if}
+			<div class="top-actions">
+				{#if data.readOnly && data.passphraseSet}
+					<a class="pill" href="/unlock?next={encodeURIComponent(page.url.pathname)}">
+						<Icon name="lock" size="0.95rem" /> Unlock
+					</a>
+				{/if}
+				{#if !data.admin}
+					<a
+						class="pill quiet"
+						href="/admin/login?next={encodeURIComponent(page.url.pathname)}"
+						title="Admin sign-in"
+					>
+						<Icon name="shield" size="0.95rem" /> Admin
+					</a>
+				{/if}
+			</div>
 		</header>
 	{/if}
 
@@ -150,11 +161,17 @@
 		white-space: nowrap;
 	}
 
-	.unlock {
+	.top-actions {
+		display: flex;
+		flex: none;
+		gap: 0.4rem;
+		margin-left: auto;
+	}
+
+	.pill {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.3rem;
-		margin-left: auto;
 		padding: 0.35rem 0.7rem;
 		color: var(--accent-on-soft);
 		background: var(--accent-soft);
@@ -162,6 +179,16 @@
 		font-size: 0.8rem;
 		font-weight: 600;
 		text-decoration: none;
+	}
+
+	.pill.quiet {
+		color: var(--muted);
+		background: transparent;
+		box-shadow: inset 0 0 0 1px var(--border);
+	}
+
+	.pill.quiet:hover {
+		color: var(--text);
 	}
 
 	main {

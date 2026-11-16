@@ -37,6 +37,7 @@
 	{#if data.publicRead}
 		<a class="look" href="/">Just looking? View the rankings</a>
 	{/if}
+	<a class="look" href="/admin/login">Admin sign-in</a>
 </AuthCard>
 
 <style>
@@ -46,7 +47,7 @@
 	}
 
 	.look {
-		margin-top: 0.8rem;
+		margin-top: 0.6rem;
 		color: var(--accent);
 		font-size: 0.85rem;
 	}
