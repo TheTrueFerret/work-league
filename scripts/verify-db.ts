@@ -2,15 +2,15 @@
 //
 // This WIPES the players, matches, participants and standings tables, so it
 // deliberately refuses to touch the database the app itself is configured with.
-import { START_RATING } from '../src/lib/elo.js';
+import { START_RATING } from '../src/lib/modules/pool';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url) {
 	console.error(
 		'Set TEST_DATABASE_URL to a throwaway Postgres database.\n' +
 			'These checks delete every row, so never point it at real data.\n\n' +
-			'  docker run -d --name pottr-pg -p 5433:5432 -e POSTGRES_PASSWORD=pottr postgres:16\n' +
-			'  export TEST_DATABASE_URL=postgres://postgres:pottr@localhost:5433/postgres\n'
+			'  docker run -d --name work-league-pg -p 5433:5432 -e POSTGRES_PASSWORD=workleague postgres:16\n' +
+			'  export TEST_DATABASE_URL=postgres://postgres:workleague@localhost:5433/postgres\n'
 	);
 	process.exit(1);
 }
@@ -21,8 +21,8 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL === url) {
 
 process.env.DATABASE_URL = url;
 
-const db = await import('../src/lib/server/db.js');
-const { matches, participants, players, standings } = await import('../src/lib/server/schema.js');
+const db = await import('../src/lib/modules/pool/server/repository');
+const { matches, participants, players, standings } = await import('../src/lib/server/schema');
 
 let failures = 0;
 

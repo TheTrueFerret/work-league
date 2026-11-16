@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { playerProfile } from '$lib/server/db.js';
+import { playerProfile } from '$lib/modules/pool/server/repository';
 
 export async function load({ params }) {
 	const profile = await playerProfile(Number(params.id));

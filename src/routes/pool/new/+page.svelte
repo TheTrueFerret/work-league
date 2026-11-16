@@ -1,6 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
-	import { computeDeltas, teamWinChance } from '$lib/elo.js';
+	import { computeDeltas, teamWinChance } from '$lib/modules/pool';
 
 	let { data, form } = $props();
 
@@ -98,7 +98,7 @@
 	const sign = (n) => (n > 0 ? `+${n}` : `${n}`);
 </script>
 
-<svelte:head><title>New match · Pottr</title></svelte:head>
+<svelte:head><title>New pool match · Work League</title></svelte:head>
 
 <header class="page-head">
 	<div>

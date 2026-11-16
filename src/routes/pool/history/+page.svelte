@@ -21,7 +21,7 @@
 	};
 </script>
 
-<svelte:head><title>History · Pottr</title></svelte:head>
+<svelte:head><title>History · Work League</title></svelte:head>
 
 <header class="page-head">
 	<div>
@@ -33,7 +33,7 @@
 {#if !data.matches.length}
 	<div class="card empty">
 		<p>No matches recorded yet.</p>
-		<a class="btn btn-primary" href="/new">Record one</a>
+		<a class="btn btn-primary" href="/pool/new">Record one</a>
 	</div>
 {:else}
 	<ul class="list">
@@ -54,7 +54,7 @@
 					{#each [{ key: 'A', team: m.teamA }, { key: 'B', team: m.teamB }] as side (side.key)}
 						<div class="side side-{side.key}" class:won={m.winner === side.key}>
 							{#each side.team as p (p.playerId)}
-								<a class="line" href="/p/{p.playerId}">
+								<a class="line" href="/players/{p.playerId}">
 									<span class="pname">{p.name}</span>
 									<span class="delta {p.delta >= 0 ? 'up' : 'down'}">{sign(p.delta)}</span>
 								</a>

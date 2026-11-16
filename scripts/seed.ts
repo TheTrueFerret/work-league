@@ -1,5 +1,5 @@
 // Fills an empty database with a demo pool night. Run: npm run seed
-import { addPlayer, close, leaderboard, recordMatch, stats } from '../src/lib/server/db.js';
+import { addPlayer, close, leaderboard, recordMatch, stats } from '../src/lib/modules/pool/server/repository.ts';
 
 if ((await stats()).players > 0) {
 	console.error('Database is not empty — refusing to seed over existing data.');

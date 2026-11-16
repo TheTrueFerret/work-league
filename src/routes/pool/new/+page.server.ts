@@ -1,5 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { activePlayers, recordMatch } from '$lib/server/db.js';
+import { activePlayers, recordMatch } from '$lib/modules/pool/server/repository';
 
 export async function load() {
 	return { players: await activePlayers() };
@@ -26,6 +26,6 @@ export const actions = {
 		} catch (err) {
 			return fail(400, { error: /** @type {Error} */ (err).message });
 		}
-		redirect(303, '/?recorded=1');
+		redirect(303, '/pool?recorded=1');
 	}
 };

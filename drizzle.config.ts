@@ -1,6 +1,6 @@
 /** @type {import('drizzle-kit').Config} */
 export default {
-	schema: './src/lib/server/schema.js',
+	schema: './src/lib/server/schema',
 	out: './drizzle',
 	dialect: 'postgresql',
 	dbCredentials: {

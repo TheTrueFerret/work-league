@@ -1,5 +1,5 @@
 // Rating engine checks. Pure maths — no database needed. Run: npm test
-import { computeDeltas, expectedScore, kFactor, tier, START_RATING } from '../src/lib/elo.js';
+import { computeDeltas, expectedScore, kFactor, tier, START_RATING } from '../src/lib/modules/pool/rating.ts';
 
 let failures = 0;
 

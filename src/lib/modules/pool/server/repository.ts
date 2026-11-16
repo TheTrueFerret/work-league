@@ -3,10 +3,30 @@ import { and, asc, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { START_RATING, computeDeltas } from '../elo.js';
-import { matches, participants, players, standings } from './schema.js';
+import { START_RATING, computeDeltas } from '../rating';
+import { matches, participants, players, standings } from '../../../server/schema';
 
-/** @typedef {ReturnType<typeof postgres>} Client */
+type Client = ReturnType<typeof postgres>;
+type Database = ReturnType<typeof drizzle>;
+type Db = Database | any;
+
+interface ConnectionScope {
+	url: string;
+	client?: Client;
+	db?: Database;
+}
+
+interface StandingRow {
+	playerId: number;
+	rating: number;
+	games: number;
+	wins: number;
+	losses: number;
+	peak: number;
+	streak: number;
+	form: string;
+	lastPlayed: Date | null;
+}
 
 /**
  * Cloudflare Workers forbid reusing a socket across requests ("Cannot perform
@@ -15,14 +35,14 @@ import { matches, participants, players, standings } from './schema.js';
  * that lives in the module-level pair below.
  * @type {AsyncLocalStorage<{ url: string, client?: Client, db?: ReturnType<typeof drizzle> }>}
  */
-const scope = new AsyncLocalStorage();
+const scope = new AsyncLocalStorage<ConnectionScope>();
 
 /** @type {Client | undefined} */
-let client;
+let client: Client | undefined;
 /** @type {ReturnType<typeof drizzle> | undefined} */
-let database;
+let database: Database | undefined;
 /** @type {string | undefined} */
-let configured;
+let configured: string | undefined;
 
 const tables = { matches, participants, players, standings };
 
@@ -30,7 +50,7 @@ const tables = { matches, participants, players, standings };
  * @param {string} url
  * @param {number} max how many sockets this pool may open
  */
-const pool = (url, max) =>
+const pool = (url: string, max: number): Client =>
 	postgres(url, {
 		// Supabase's transaction pooler cannot reuse prepared statements.
 		prepare: false,
@@ -45,7 +65,7 @@ const pool = (url, max) =>
  * Cloudflare Workers deliver secrets. Safe to call on every request.
  * @param {string | undefined} url
  */
-export function useDatabaseUrl(url) {
+export function useDatabaseUrl(url: string | undefined): void {
 	if (url && url !== configured) {
 		configured = url;
 		// Drop any pool built against the previous URL.
@@ -63,11 +83,15 @@ export function useDatabaseUrl(url) {
  * @param {(promise: Promise<unknown>) => void} [waitUntil] defers the close
  * @returns {Promise<T>}
  */
-export async function withConnection(url, fn, waitUntil) {
+export async function withConnection<T>(
+	url: string | undefined,
+	fn: () => T | Promise<T>,
+	waitUntil?: (promise: Promise<unknown>) => void
+): Promise<T> {
 	if (!url) throw new Error(missing);
 
 	/** @type {{ url: string, client?: Client, db?: ReturnType<typeof drizzle> }} */
-	const store = { url };
+	const store: ConnectionScope = { url };
 
 	try {
 		return await scope.run(store, fn);
@@ -111,36 +135,18 @@ export { conn as getDb };
 const CHUNK = 500;
 
 /** @template T @param {T[]} items @returns {T[][]} */
-function chunked(items) {
-	/** @type {T[][]} */
-	const out = [];
+function chunked<T>(items: T[]): T[][] {
+	const out: T[][] = [];
 	for (let i = 0; i < items.length; i += CHUNK) out.push(items.slice(i, i + CHUNK));
 	return out;
 }
-
-/** @typedef {ReturnType<typeof conn>} Database */
-/** Either the pool or a transaction handle — both accept the same queries. */
-/** @typedef {Database | Parameters<Parameters<Database['transaction']>[0]>[0]} Db */
-
-/**
- * @typedef {object} StandingRow
- * @property {number} playerId
- * @property {number} rating
- * @property {number} games
- * @property {number} wins
- * @property {number} losses
- * @property {number} peak
- * @property {number} streak
- * @property {string} form
- * @property {Date | null} lastPlayed
- */
 
 /**
  * Writes standings rows, creating them if a player somehow has none yet.
  * @param {Db} tx
  * @param {StandingRow[]} rows
  */
-async function writeStandings(tx, rows) {
+async function writeStandings(tx: Db, rows: StandingRow[]): Promise<void> {
 	for (const batch of chunked(rows)) {
 		await tx
 			.insert(standings)
@@ -166,7 +172,7 @@ async function writeStandings(tx, rows) {
  * @param {number} id
  * @returns {StandingRow}
  */
-const blank = (id) => ({
+const blank = (id: number): StandingRow => ({
 	playerId: id,
 	rating: START_RATING,
 	games: 0,
@@ -186,7 +192,7 @@ const blank = (id) => ({
  * @param {Date} playedAt
  * @returns {StandingRow}
  */
-function advance(s, won, delta, playedAt) {
+function advance(s: StandingRow, won: boolean, delta: number, playedAt: Date): StandingRow {
 	const rating = s.rating + delta;
 	return {
 		playerId: s.playerId,
@@ -208,11 +214,11 @@ function advance(s, won, delta, playedAt) {
  * that followed it. Appending a match doesn't — that path stays incremental.
  * @param {Db} tx
  */
-async function replayAll(tx) {
+async function replayAll(tx: Db): Promise<void> {
 	const everyone = await tx.select({ id: players.id }).from(players);
 
 	/** @type {Map<number, StandingRow>} */
-	const state = new Map(everyone.map((p) => [p.id, blank(p.id)]));
+	const state = new Map<number, StandingRow>(everyone.map((p) => [p.id, blank(p.id)]));
 
 	const rows = await tx
 		.select({
@@ -227,10 +233,10 @@ async function replayAll(tx) {
 		.orderBy(asc(matches.playedAt), asc(matches.id));
 
 	/** @type {{ matchId: number, playerId: number, team: 'A' | 'B', won: boolean, ratingBefore: number, delta: number }[]} */
-	const lines = [];
+	const lines: Array<{ matchId: number; playerId: number; team: 'A' | 'B'; won: boolean; ratingBefore: number; delta: number }> = [];
 
 	/** @type {typeof rows} */
-	let batch = [];
+	let batch: typeof rows = [];
 
 	const flush = () => {
 		if (!batch.length) return;
@@ -240,16 +246,16 @@ async function replayAll(tx) {
 
 		if (teamA.length && teamB.length) {
 			/** @param {typeof batch} side */
-			const rated = (side) =>
+			const rated = (side: typeof batch) =>
 				side.map((r) => {
-					const s = /** @type {StandingRow} */ (state.get(r.playerId));
+					const s = state.get(r.playerId)!;
 					return { id: r.playerId, rating: s.rating, games: s.games };
 				});
 
 			const deltas = computeDeltas(rated(teamA), rated(teamB), teamA[0].won ? 'A' : 'B');
 
 			for (const r of batch) {
-				const s = /** @type {StandingRow} */ (state.get(r.playerId));
+				const s = state.get(r.playerId)!;
 				const delta = deltas.get(r.playerId) ?? 0;
 
 				lines.push({
@@ -364,7 +370,7 @@ export async function history(limit = 100) {
  * Everything needed for one player's profile page.
  * @param {number} id
  */
-export async function playerProfile(id) {
+export async function playerProfile(id: number) {
 	const [player] = await conn()
 		.select({
 			id: players.id,
@@ -434,7 +440,7 @@ export async function stats() {
 /* -------------------------------------------------------------------------- */
 
 /** @param {string} name */
-function cleanName(name) {
+function cleanName(name: string): string {
 	const clean = name.trim().replace(/\s+/g, ' ');
 	if (!clean) throw new Error('Name cannot be empty');
 	if (clean.length > 40) throw new Error('Name is too long');
@@ -442,7 +448,7 @@ function cleanName(name) {
 }
 
 /** @param {string} name */
-export async function addPlayer(name) {
+export async function addPlayer(name: string) {
 	const clean = cleanName(name);
 
 	return conn().transaction(async (tx) => {
@@ -462,7 +468,7 @@ export async function addPlayer(name) {
  * @param {number} id
  * @param {string} name
  */
-export async function renamePlayer(id, name) {
+export async function renamePlayer(id: number, name: string): Promise<void> {
 	const clean = cleanName(name);
 
 	await conn().transaction(async (tx) => {
@@ -481,12 +487,12 @@ export async function renamePlayer(id, name) {
  * @param {number} id
  * @param {boolean} active
  */
-export async function setPlayerActive(id, active) {
+export async function setPlayerActive(id: number, active: boolean): Promise<void> {
 	await conn().update(players).set({ active }).where(eq(players.id, id));
 }
 
 /** @param {number} id */
-export async function deletePlayer(id) {
+export async function deletePlayer(id: number): Promise<void> {
 	await conn().transaction(async (tx) => {
 		const [{ n }] = await tx
 			.select({ n: count() })
@@ -510,7 +516,12 @@ export async function deletePlayer(id) {
  * @param {'A' | 'B'} winner
  * @param {string} [note]
  */
-export async function recordMatch(teamA, teamB, winner, note) {
+export async function recordMatch(
+	teamA: number[],
+	teamB: number[],
+	winner: 'A' | 'B',
+	note = ''
+) {
 	if (!teamA.length || !teamB.length) throw new Error('Both teams need at least one player');
 
 	const ids = [...teamA, ...teamB];
@@ -525,11 +536,11 @@ export async function recordMatch(teamA, teamB, winner, note) {
 
 		if (current.length !== ids.length) throw new Error('Unknown player');
 
-		const before = new Map(current.map((s) => [s.playerId, s]));
+		const before = new Map<number, StandingRow>(current.map((s) => [s.playerId, s]));
 		/** @param {number[]} side */
-		const rated = (side) =>
+		const rated = (side: number[]) =>
 			side.map((id) => {
-				const s = /** @type {StandingRow} */ (before.get(id));
+				const s = before.get(id)!;
 				return { id, rating: s.rating, games: s.games };
 			});
 
@@ -540,9 +551,9 @@ export async function recordMatch(teamA, teamB, winner, note) {
 			.values({ note: note?.trim() || null })
 			.returning({ id: matches.id, playedAt: matches.playedAt });
 
-		const rows = ids.map((id) => {
-			const team = /** @type {'A' | 'B'} */ (teamA.includes(id) ? 'A' : 'B');
-			const s = /** @type {StandingRow} */ (before.get(id));
+		const rows: Array<typeof participants.$inferInsert> = ids.map((id) => {
+			const team: 'A' | 'B' = teamA.includes(id) ? 'A' : 'B';
+			const s = before.get(id)!;
 			return {
 				matchId: match.id,
 				playerId: id,
@@ -557,7 +568,7 @@ export async function recordMatch(teamA, teamB, winner, note) {
 		await writeStandings(
 			tx,
 			rows.map((r) =>
-				advance(/** @type {StandingRow} */ (before.get(r.playerId)), r.won, r.delta, match.playedAt)
+				advance(before.get(r.playerId)!, r.won, r.delta ?? 0, match.playedAt)
 			)
 		);
 
@@ -566,7 +577,7 @@ export async function recordMatch(teamA, teamB, winner, note) {
 }
 
 /** @param {number} id */
-export async function deleteMatch(id) {
+export async function deleteMatch(id: number): Promise<void> {
 	await conn().transaction(async (tx) => {
 		await tx.delete(matches).where(eq(matches.id, id));
 		await replayAll(tx);

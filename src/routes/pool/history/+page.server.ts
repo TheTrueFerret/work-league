@@ -1,5 +1,5 @@
 import { fail } from '@sveltejs/kit';
-import { deleteMatch, history } from '$lib/server/db.js';
+import { deleteMatch, history } from '$lib/modules/pool/server/repository';
 
 export async function load() {
 	return { matches: await history(150) };

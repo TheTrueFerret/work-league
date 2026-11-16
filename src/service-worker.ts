@@ -1,10 +1,10 @@
 /// <reference types="@sveltejs/kit" />
 import { build, files, version } from '$service-worker';
 
-// Cache the app shell so Pottr opens instantly from the home screen, even on
+// Cache the app shell so Work League opens instantly from the home screen, even on
 // the pub wifi. Data always comes from the network — stale rankings would be
 // worse than none.
-const CACHE = `pottr-${version}`;
+const CACHE = `work-league-${version}`;
 const SHELL = [...build, ...files];
 
 self.addEventListener('install', (event) => {

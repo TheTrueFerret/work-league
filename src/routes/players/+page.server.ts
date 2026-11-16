@@ -1,5 +1,5 @@
 import { fail } from '@sveltejs/kit';
-import { addPlayer, deletePlayer, leaderboard, renamePlayer, setPlayerActive } from '$lib/server/db.js';
+import { addPlayer, deletePlayer, leaderboard, renamePlayer, setPlayerActive } from '$lib/modules/pool/server/repository';
 
 export async function load() {
 	return { players: await leaderboard() };

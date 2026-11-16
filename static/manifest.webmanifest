@@ -1,7 +1,7 @@
 {
-	"name": "Pottr — Pool Ladder",
-	"short_name": "Pottr",
-	"description": "Self-hosted pool ranking and ELO ratings.",
+	"name": "Work League",
+	"short_name": "Work League",
+	"description": "Modular leagues for friendly competition at work.",
 	"start_url": "/",
 	"scope": "/",
 	"display": "standalone",
@@ -16,7 +16,7 @@
 		{ "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
 	],
 	"shortcuts": [
-		{ "name": "Record a match", "short_name": "New match", "url": "/new" },
-		{ "name": "Rankings", "short_name": "Ranks", "url": "/" }
+		{ "name": "Record a pool match", "short_name": "New match", "url": "/pool/new" },
+		{ "name": "Pool rankings", "short_name": "Ranks", "url": "/pool" }
 	]
 }

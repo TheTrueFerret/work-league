@@ -11,7 +11,7 @@
 	const archived = $derived(data.players.filter((p) => !p.active));
 </script>
 
-<svelte:head><title>Players · Pottr</title></svelte:head>
+<svelte:head><title>Players · Work League</title></svelte:head>
 
 <header class="page-head">
 	<div>
@@ -59,7 +59,7 @@
 						</form>
 					{:else}
 						<div class="who">
-							<a class="name" href="/p/{p.id}">{p.name}</a>
+							<a class="name" href="/players/{p.id}">{p.name}</a>
 							<span class="sub num">
 								{p.rating} · {p.games} {p.games === 1 ? 'match' : 'matches'}
 							</span>

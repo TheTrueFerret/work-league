@@ -1,5 +1,5 @@
 <script>
-	import { tier } from '$lib/elo.js';
+	import { tier } from '$lib/modules/pool';
 
 	let { data } = $props();
 
@@ -41,7 +41,7 @@
 		new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 </script>
 
-<svelte:head><title>{p.name} · Pottr</title></svelte:head>
+<svelte:head><title>{p.name} · Work League</title></svelte:head>
 
 <header class="page-head">
 	<div>

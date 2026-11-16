@@ -11,7 +11,7 @@ import {
 	timestamp,
 	uniqueIndex
 } from 'drizzle-orm/pg-core';
-import { START_RATING } from '../elo.js';
+import { START_RATING } from '../modules/pool';
 
 export const teamSide = pgEnum('team_side', ['A', 'B']);
 

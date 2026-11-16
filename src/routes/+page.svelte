@@ -1,201 +1,57 @@
-<script>
-	import { tier } from '$lib/elo.js';
-
-	let { data } = $props();
-
-	const ranked = $derived(data.players.filter((p) => p.games > 0));
-	const unranked = $derived(data.players.filter((p) => p.games === 0));
-
-	const medal = ['🥇', '🥈', '🥉'];
-
-	/** @param {number} streak */
-	function streakLabel(streak) {
-		if (streak >= 3) return `${streak} win streak`;
-		if (streak <= -3) return `${-streak} loss streak`;
-		return null;
-	}
+<script lang="ts">
+	import { leagueModules } from '$lib/modules';
 </script>
 
-<svelte:head><title>Ranks · Pottr</title></svelte:head>
+<svelte:head>
+	<title>Work League</title>
+	<meta name="description" content="Friendly office competition, all in one league." />
+</svelte:head>
 
-<header class="page-head">
-	<div>
-		<h1>Rankings</h1>
-		<p>{data.stats.matches} {data.stats.matches === 1 ? 'match' : 'matches'} played</p>
-	</div>
-	<a class="btn btn-primary" href="/new">Record match</a>
+<header class="welcome">
+	<span class="eyebrow">Your office. Your games.</span>
+	<h1>Pick a league and get playing.</h1>
+	<p>Work League keeps every friendly rivalry in one place. Each game is an independent module, so the league can grow with your team.</p>
 </header>
 
-{#if !data.players.length}
-	<div class="card empty">
-		<p>No players yet.</p>
-		<a class="btn" href="/players">Add the first player</a>
+<section aria-labelledby="modules-heading">
+	<div class="section-head">
+		<h2 id="modules-heading">Game modules</h2>
+		<span>{leagueModules.length} active</span>
 	</div>
-{:else}
-	<ol class="board">
-		{#each ranked as p, i (p.id)}
-			<li>
-				<a class="row" href="/p/{p.id}">
-					<span class="rank num" class:top={i < 3}>{medal[i] ?? i + 1}</span>
-
-					<span class="who">
-						<span class="name">{p.name}{#if !p.active}<span class="pill">archived</span>{/if}</span>
-						<span class="sub">
-							<span class="num">{p.wins}W&thinsp;–&thinsp;{p.losses}L</span>
-							<span class="dot">·</span>
-							<span>{tier(p.rating)}</span>
-							{#if streakLabel(p.streak)}
-								<span class="dot">·</span>
-								<span class:hot={p.streak > 0} class:cold={p.streak < 0}>{streakLabel(p.streak)}</span>
-							{/if}
-						</span>
-					</span>
-
-					<span class="form" aria-label="Recent form: {p.form}">
-						{#each p.form.split('') as r, j (j)}
-							<i class={r === 'W' ? 'w' : 'l'}></i>
-						{/each}
-					</span>
-
-					<span class="rating num">{p.rating}</span>
-				</a>
-			</li>
+	<div class="module-grid">
+		{#each leagueModules as module (module.id)}
+			<a class="module-card" href={module.href} style:--module-accent={module.accent}>
+				<div class="module-icon" aria-hidden="true">8</div>
+				<div>
+					<h3>{module.name}</h3>
+					<p>{module.description}</p>
+				</div>
+				<span class="open">Open <span aria-hidden="true">→</span></span>
+			</a>
 		{/each}
-	</ol>
+	</div>
+</section>
 
-	{#if unranked.length}
-		<h2 class="section">Not yet rated</h2>
-		<ul class="board">
-			{#each unranked as p (p.id)}
-				<li>
-					<a class="row quiet" href="/p/{p.id}">
-						<span class="rank">–</span>
-						<span class="who"><span class="name">{p.name}</span><span class="sub">No matches yet</span></span>
-						<span class="rating num muted">{p.rating}</span>
-					</a>
-				</li>
-			{/each}
-		</ul>
-	{/if}
-{/if}
+<aside class="extensible">
+	<strong>Built to expand.</strong>
+	<span>Darts, table football or your own game can join as another typed module.</span>
+</aside>
 
 <style>
-	.board {
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-		margin: 0;
-		padding: 0;
-		list-style: none;
-	}
-
-	.section {
-		margin: 1.75rem 0 0.6rem;
-		color: var(--muted);
-		font-size: 0.8rem;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-	}
-
-	.row {
-		display: grid;
-		grid-template-columns: 2rem 1fr auto auto;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.75rem 0.9rem;
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: var(--r-md);
-		text-decoration: none;
-		transition: border-color 0.15s;
-	}
-
-	.row:hover {
-		border-color: color-mix(in oklab, var(--accent) 45%, var(--border));
-	}
-
-	.row.quiet {
-		grid-template-columns: 2rem 1fr auto;
-		opacity: 0.7;
-	}
-
-	.rank {
-		font-size: 0.95rem;
-		font-weight: 700;
-		color: var(--muted);
-		text-align: center;
-	}
-
-	.rank.top {
-		font-size: 1.15rem;
-	}
-
-	.who {
-		display: flex;
-		flex-direction: column;
-		min-width: 0;
-	}
-
-	.name {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		font-weight: 600;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.sub {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.3rem;
-		font-size: 0.78rem;
-		color: var(--muted);
-	}
-
-	.dot {
-		opacity: 0.5;
-	}
-
-	.hot {
-		color: var(--win);
-	}
-
-	.cold {
-		color: var(--loss);
-	}
-
-	.form {
-		display: flex;
-		gap: 2px;
-	}
-
-	.form i {
-		width: 5px;
-		height: 16px;
-		border-radius: 2px;
-	}
-
-	.form i.w {
-		background: var(--win);
-	}
-
-	.form i.l {
-		background: color-mix(in oklab, var(--loss) 55%, transparent);
-	}
-
-	.rating {
-		min-width: 3.2rem;
-		font-size: 1.15rem;
-		font-weight: 700;
-		text-align: right;
-		letter-spacing: -0.02em;
-	}
-
-	@media (max-width: 21rem) {
-		.form {
-			display: none;
-		}
-	}
+	.welcome { padding: 3.5rem 0 2.75rem; max-width: 39rem; }
+	.eyebrow { color: var(--accent); font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+	.welcome h1 { margin-top: .55rem; font-size: clamp(2.4rem, 9vw, 4.25rem); line-height: .98; letter-spacing: -.055em; }
+	.welcome p { max-width: 34rem; margin: 1.25rem 0 0; color: var(--muted); font-size: 1.05rem; }
+	.section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: .8rem; }
+	.section-head span { color: var(--muted); font-size: .8rem; }
+	.module-grid { display: grid; gap: .8rem; }
+	.module-card { --module-accent: var(--accent); display: grid; grid-template-columns: auto 1fr auto; gap: 1rem; align-items: center; padding: 1.2rem; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 1.15rem; text-decoration: none; box-shadow: var(--shadow); transition: transform .18s, border-color .18s; }
+	.module-card:hover { transform: translateY(-2px); border-color: var(--module-accent); }
+	.module-icon { display: grid; place-items: center; width: 3.25rem; height: 3.25rem; color: #09230f; background: var(--module-accent); border-radius: 1rem; font-size: 1.3rem; font-weight: 850; }
+	.module-card h3 { margin-bottom: .25rem; font-size: 1.05rem; }
+	.module-card p { margin: 0; color: var(--muted); font-size: .85rem; }
+	.open { color: var(--module-accent); font-size: .85rem; font-weight: 700; }
+	.extensible { display: flex; gap: .45rem; margin-top: 1.25rem; padding: 1rem 1.1rem; color: var(--muted); background: var(--surface-2); border-radius: var(--r-lg); font-size: .83rem; }
+	.extensible strong { color: var(--text); }
+	@media (max-width: 32rem) { .welcome { padding-top: 2.4rem; } .module-card { grid-template-columns: auto 1fr; } .open { grid-column: 2; } .extensible { flex-direction: column; } }
 </style>
