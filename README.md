@@ -1,176 +1,159 @@
-# 🎱 Pottr
+# Work League
 
-A self-hosted pool ladder. Record who won, see who's actually any good.
+A self-hosted league for friendly competition at work. Play **pool**, **ping pong** and **darts**
+(or add your own game), keep a proper ELO ranking per game, and crown an **office champion**
+across all of them.
 
-- **Any team size.** 1v1, 2v2, 4v4 — whatever you're playing.
-- **Upsets pay.** Beat someone well above you and you take a big chunk of their
-  rating. Beat someone far below you and you'll barely notice.
-- **Installable.** Add it to your phone's home screen and it opens like an app.
-- **Light and dark**, following whatever your phone is set to.
+Made by [TheTrueFerret](https://github.com/TheTrueFerret). Open source under the MIT licence:
+clone it, host it for your office, make it yours.
 
-SvelteKit + Drizzle + Supabase Postgres, running on Cloudflare Workers.
+<p>
+  <img src="docs/screenshots/home.png" width="200" alt="The league home screen with pool, ping pong and darts">
+  <img src="docs/screenshots/darts-scorer.png" width="200" alt="The darts scorer suggesting a checkout">
+  <img src="docs/screenshots/pingpong-scorer.png" width="200" alt="The ping pong point-by-point scorer">
+  <img src="docs/screenshots/ranks.png" width="200" alt="Darts rankings with Bronze to Platinum rank badges">
+  <img src="docs/screenshots/rebranded.png" width="200" alt="The same league rebranded in blue">
+</p>
 
-## Setup
+## What you get
 
-**1. Create a Supabase project**, then grab the connection string from
-*Project Settings → Database → Connection string → URI*. Either pooler works;
-the transaction pooler (port 6543) is the usual choice.
+- **Game modules.** Each game is one folder with its own rules and its own match screen. Pool
+  records teams of any size, ping pong has a point-by-point scorer, and darts has a full X01
+  calculator with checkout hints. Admins switch games on and off without redeploying.
+- **Ranks from Bronze to Diamond** in every game and in the championship, with progress to the
+  next one on your profile.
+- **ELO for every game.** One shared engine handles singles, teams and free-for-alls. Upsets pay,
+  newcomers find their level fast, veterans settle down, and you see what you stand to win or lose
+  before you play. Deleting an old result replays everything after it.
+- **Office championship.** Everyone is on the table from day one. Your score is your average
+  rating across every game, with games you haven't played counted at the starting rating.
+- **Your brand.** Upload a logo and pick one colour (or take it from the logo), and the whole UI
+  builds its light and dark palette from it, the way Android's Material You does.
+- **Simple access.** One office passphrase keeps outsiders out, and a separate admin password
+  protects settings and deletions. Optionally, anyone can view the rankings read-only.
+- **Phone first.** Installable as an app, works with the screen on the table, keeps a live game
+  safe on the device if the connection drops.
+- **Hosts anywhere.** Cloudflare Workers with any PostgreSQL, a single Docker container with an
+  embedded database, or Docker Compose with PostgreSQL.
+
+## Quick start (local)
+
+Needs Node 22.18 or newer. No database server required: development uses an embedded
+PostgreSQL ([PGlite](https://pglite.dev)) stored in `./.data`.
 
 ```sh
-cp .env.example .env      # paste your connection string into DATABASE_URL
+cp .env.example .env      # set ADMIN_PASSWORD
 npm install
-npm run db:migrate        # creates the four tables
+npm run db:migrate
+npm run seed              # optional: demo players and matches for every game
+npm run dev
 ```
 
-If you'd rather not run migrations locally, paste `drizzle/0000_init.sql`
-straight into the Supabase SQL editor instead.
+Open http://localhost:5173, sign in at `/admin` with your `ADMIN_PASSWORD`, then set your name,
+logo, colour and office passphrase.
 
-**2. Run it locally.**
+## Hosting
 
-```sh
-npm run dev               # http://localhost:5173
-```
+See [docs/self-hosting.md](docs/self-hosting.md) for the full guide. Summary:
 
-**3. Deploy to Cloudflare.**
-
-```sh
-npx wrangler secret put DATABASE_URL   # paste the same connection string
-npm run deploy
-```
-
-Add it as a **Secret**, not a plaintext Variable — it contains your database
-password. (`keep_vars: true` in `wrangler.jsonc` stops deploys from wiping
-dashboard-set variables, but a secret is the right home for a password anyway.)
-
-Check it took with `npx wrangler secret list`.
-
-`npm run preview` runs the built Worker in Cloudflare's own runtime before you
-ship it, reading its secrets from a local `.dev.vars` file:
-
-```sh
-echo 'DATABASE_URL=postgres://...' > .dev.vars   # git-ignored
-npm run preview
-```
-
-Then open **Players**, add everyone, and start recording matches.
+| Where                 | Database                                  | How                                                                                                       |
+| --------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Docker, one container | Embedded, in a volume                     | `docker run -p 3000:3000 -v league:/data -e ADMIN_PASSWORD=… -e ORIGIN=http://localhost:3000 work-league` |
+| Docker Compose        | PostgreSQL 17 container                   | `ADMIN_PASSWORD=… docker compose up -d`                                                                   |
+| Cloudflare Workers    | Any hosted PostgreSQL (Supabase, Neon, …) | `wrangler secret put DATABASE_URL`, `… ADMIN_PASSWORD`, `npm run deploy`                                  |
+| Any Node host         | Embedded or PostgreSQL                    | `npm run build:node && npm run db:migrate && npm start`                                                   |
 
 ### Configuration
 
-| Where              | Name           | How to set it                             |
-| ------------------ | -------------- | ----------------------------------------- |
-| Cloudflare         | `DATABASE_URL` | `npx wrangler secret put DATABASE_URL`    |
-| `npm run dev`      | `DATABASE_URL` | `.env`                                    |
-| `npm run preview`  | `DATABASE_URL` | `.dev.vars`                               |
-| migrations / seed  | `DATABASE_URL` | `.env`                                    |
+Only a few things come from the environment. Everything else is set in the app at `/admin`.
 
-The Worker's name and compatibility flags live in `wrangler.jsonc`. Rename
-`pottr` there if you want a different `*.workers.dev` subdomain, or add a
-[custom domain](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/).
+| Variable         | Required  | Purpose                                                                                 |
+| ---------------- | --------- | --------------------------------------------------------------------------------------- |
+| `DATABASE_URL`   | yes       | `postgres://…` for PostgreSQL, or `pglite:./path` for the embedded database (Node only) |
+| `ADMIN_PASSWORD` | for admin | Unlocks `/admin`. Without it, admin features stay off                                   |
+| `SESSION_SECRET` | no        | Signs cookies. If unset, a random one is generated and stored in the database           |
+| `ORIGIN`         | Node only | The public URL, e.g. `https://league.example.com`, so form submissions are accepted     |
 
-`nodejs_compat` is required — postgres.js needs `node:net`, `node:tls` and
-`AsyncLocalStorage`.
+### Upgrading from the pool ladder (Open Pottr)
 
-### Install it on your phone
+Back up first (`pg_dump`), then run `npm run db:migrate`. Migration `0001_game_modules` moves
+every existing match and rating into the new tables as pool matches. Nothing is recalculated, and a
+test proves a full replay gives the same ratings.
 
-Open the site and choose **Add to Home Screen** (iOS: Share → Add to Home
-Screen; Android: menu → Install app). It runs full-screen with no browser
-chrome, and the app shell is cached so it opens instantly.
+## How ratings work
 
-> **Pottr has no login.** Anyone who can reach it can record matches and edit
-> players. A `*.workers.dev` URL is public, so put
-> [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/)
-> in front of it if you don't want strangers editing your ladder.
+Every player starts at 1000 in each game. After a match, each player is compared with every
+opposing side's average rating:
 
-## How the rating works
-
-Everyone starts at **1000**.
-
-Each player is scored against the **average rating of the opposing team**, so in
-a 4v4 the weakest player on the winning side gains the most and the strongest
-gains the least. After every match:
-
-```
-expected = 1 / (1 + 10 ^ ((opponentAverage - yourRating) / 400))
-change   = K × (1 if you won else 0 − expected)
+```text
+expected = 1 / (1 + 10 ^ ((opponentAverage - rating) / 400))
+change   = K × Σ(result - expected) / (sides - 1)
 ```
 
-`K` is how much a single match can move you: **40** for your first 10 games,
-**28** up to 30 games, then **20**. New players find their level quickly and
-established ratings stay stable.
+`result` is 1 for finishing ahead of that side, 0.5 for a tie, and 0 for finishing behind. `K` is 40 for
+a player's first 10 games, 28 up to 30 games, and 20 after that. With two sides this is classic team
+ELO; in a darts free-for-all a match still moves a player by at most one K.
 
-What that means at the table:
+### Ranks
 
-| Match                        | Winner gets | Loser drops |
-| ---------------------------- | ----------- | ----------- |
-| 900 beats 1400 (big upset)   | **+19**     | −19         |
-| 1200 beats 1200 (coin flip)  | **+10**     | −10         |
-| 1400 beats 900 (as expected) | **+1**      | −1          |
+Every game and the championship share one ladder, measured from the starting rating:
 
-The match screen shows every player's potential gain and loss *before* you pick
-a winner, so nobody's surprised.
+| Rank     | Rating (start 1000) |
+| -------- | ------------------- |
+| Diamond  | 1200 and up         |
+| Platinum | 1125–1199           |
+| Gold     | 1050–1124           |
+| Silver   | 975–1049            |
+| Bronze   | below 975           |
 
-## Fixing mistakes
+Everyone starts in Silver. Profiles show how many points you need for the next rank.
 
-Recorded the wrong result? Delete the match from **History**.
+## Adding a game
 
-Ratings are path-dependent, so removing an old match invalidates every rating
-that came after it. Rather than trying to unpick the arithmetic, Pottr replays
-the whole history from scratch whenever a match is deleted — every rating ends
-up exactly as if the mistake never happened. Recording a *new* match is always
-the most recent event, so that path updates in place instead.
-
-Players who've played matches can't be deleted, only **archived** — that hides
-them from match entry while keeping everyone else's history intact.
-
-## Notes on running in a Worker
-
-Two Cloudflare constraints shaped the database layer:
-
-- **A socket may not outlive its request.** Workers throw *"Cannot perform I/O
-  on behalf of a different request"* if a later request touches a connection
-  opened by an earlier one, which showed up as intermittent 500s. Each request
-  now gets its own connection via `AsyncLocalStorage`, closed on the way out
-  with `waitUntil`. Under Node the old shared pool is still used.
-- **There is no `process.env`.** Secrets arrive on the request, so
-  `hooks.server.js` hands the connection string to the pool per request.
-
-Connections are opened with `fetch_types: false` to save a round trip, and
-`prepare: false` because Supabase's transaction pooler can't reuse prepared
-statements.
+A game is a folder in `src/lib/modules/<id>/` that exports a `GameModule`: its rules, rating
+settings and a screen for recording a match. Register it in `src/lib/modules/registry.ts`, and it
+gets rankings, history, profiles, championship points and theming automatically. See
+[docs/writing-a-module.md](docs/writing-a-module.md).
 
 ## Development
 
 ```sh
-npm run dev          # dev server with hot reload
-npm test             # rating engine checks — pure maths, no database
-npm run test:db      # database checks (see below)
-npm run seed         # fill an empty database with a demo pool night
-npm run db:studio    # browse the data in Drizzle Studio
+npm run dev          # local development
+npm run check        # TypeScript and Svelte diagnostics
+npm run lint         # Prettier and ESLint
+npm test             # unit and database tests (in-memory PGlite)
+npm run test:e2e     # browser smoke tests (Playwright)
+npm run build        # Cloudflare build; build:node for Node and Docker
+npm run db:generate  # write a migration after changing a schema file
+npm run db:migrate   # apply migrations
+npm run seed         # demo data in an empty database
 ```
 
-`npm run test:db` **deletes every row**, so it refuses to use `DATABASE_URL` and
-insists on a separate `TEST_DATABASE_URL`:
+Stack: SvelteKit 2, Svelte 5, strict TypeScript, Drizzle ORM, PostgreSQL or PGlite, Valibot, and
+Material Color Utilities.
 
-```sh
-docker run -d --name pottr-pg -p 5433:5432 -e POSTGRES_PASSWORD=pottr postgres:16
-TEST_DATABASE_URL=postgres://postgres:pottr@localhost:5433/postgres npm run test:db
+```text
+src/lib/
+├── core/            pure logic: ELO engine, standings, championship, formatting
+├── modules/         game modules (pool, pingpong, darts) and the registry
+├── components/      shared UI: side picker, icons, rating curve
+├── live/            live-match state shared by the scorers
+├── theme/           palette generation and logo processing
+└── server/          database, repositories, auth, settings
+src/routes/
+├── [game=game]/     rankings, play and history for every game
+├── players/         people and profiles
+├── championship/    the office table
+├── admin/           branding, games, access
+└── unlock/          the office passphrase screen
 ```
 
-### Changing the schema
+## Credit
 
-Edit `src/lib/server/schema.js`, then:
+Work League is made by [TheTrueFerret](https://github.com/TheTrueFerret). The footer credit and
+its link are part of the app, not a setting. The MIT licence lets you change anything, but if you
+run a copy, please keep the credit. It's how other offices find the project.
 
-```sh
-npm run db:generate  # writes a new migration into drizzle/
-npm run db:migrate   # applies it
-```
+## Licence
 
-| Path                      | What's in it                                    |
-| ------------------------- | ----------------------------------------------- |
-| `src/lib/elo.js`          | The rating maths. Shared by server and browser.  |
-| `src/lib/server/schema.js`| Drizzle table definitions.                       |
-| `src/lib/server/db.js`    | Queries, transactions, and the history replay.   |
-| `src/hooks.server.js`     | Per-request database wiring for Cloudflare.      |
-| `src/routes/app.css`      | Colour tokens for both light and dark.           |
-| `drizzle/`                | Generated SQL migrations.                        |
-| `wrangler.jsonc`          | Worker name, flags and static-asset binding.     |
+[MIT](LICENSE)

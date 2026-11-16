@@ -29,3 +29,10 @@ vite.config.ts.timestamp-*
 
 # Wrangler scratch
 .wrangler
+
+# Embedded PGlite databases (DATABASE_URL=pglite:./.data/…)
+.data
+
+# Playwright
+/test-results
+/playwright-report

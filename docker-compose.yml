@@ -1,0 +1,31 @@
+# Work League with its own PostgreSQL. Start: ADMIN_PASSWORD=… docker compose up -d
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: workleague
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-workleague}
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d workleague']
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-workleague}@db:5432/workleague
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD to unlock /admin}
+      # The address people open in their browser.
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+    ports:
+      - '3000:3000'
+
+volumes:
+  db:
