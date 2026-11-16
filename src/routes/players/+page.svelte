@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { shell } from '$lib/shell';
 	import { enhance } from '$app/forms';
 	import { plural } from '$lib/core/format';
@@ -28,7 +29,7 @@
 
 {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
 
-{#if shell().member}
+{#if shell().admin}
 	<form
 		class="add"
 		method="POST"
@@ -51,6 +52,11 @@
 		/>
 		<button class="btn btn-primary">Add</button>
 	</form>
+{:else}
+	<p class="admin-only muted">
+		Only an admin can add people.
+		<a href="/admin/login?next={encodeURIComponent(page.url.pathname)}">Admin sign-in</a>
+	</p>
 {/if}
 
 {#each groups as group (group.title)}
@@ -123,7 +129,11 @@
 {/each}
 
 {#if !data.players.length}
-	<p class="empty">Nobody here yet. Add the first person above.</p>
+	<p class="empty">
+		Nobody here yet.{shell().admin
+			? ' Add the first person above.'
+			: ' Ask an admin to add people.'}
+	</p>
 {/if}
 
 <style>
@@ -131,6 +141,17 @@
 		display: flex;
 		gap: 0.5rem;
 		margin-bottom: 1.25rem;
+	}
+
+	.admin-only {
+		margin: 0 0 1.25rem;
+		font-size: 0.85rem;
+	}
+
+	.admin-only a {
+		margin-left: 0.25rem;
+		color: var(--accent);
+		font-weight: 600;
 	}
 
 	.row {

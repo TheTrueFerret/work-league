@@ -3,8 +3,21 @@ import { expect, test, type Page } from '@playwright/test';
 /** Each project gets its own players, as both run against one database. */
 const unique = (name: string, page: Page) => `${name} ${page.viewportSize()!.width}`;
 
+/** Signs in with ADMIN_PASSWORD from playwright.config.ts. */
+async function signInAsAdmin(page: Page, next = '/admin') {
+	await page.goto(`/admin/login?next=${encodeURIComponent(next)}`);
+	await page.getByLabel('Admin password').fill('e2e-admin-password');
+	await page.getByRole('button', { name: 'Sign in' }).click();
+	await expect(page).toHaveURL(new RegExp(`${next}$`));
+}
+
+/** Only admins can add people. */
 async function addPlayer(page: Page, name: string) {
 	await page.goto('/players', { waitUntil: 'networkidle' });
+	if (await page.getByText('Only an admin can add people').isVisible()) {
+		await signInAsAdmin(page, '/players');
+		await page.waitForLoadState('networkidle');
+	}
 	await page.getByPlaceholder('Add a person').fill(name);
 	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByRole('link', { name: new RegExp(name) })).toBeVisible();
@@ -116,4 +129,13 @@ test('branding keeps what was typed, and a logo can be cropped before upload', a
 	await page.getByLabel('Brand colour hex').fill('#3dcd58');
 	await page.getByRole('button', { name: 'Save branding' }).click();
 	await expect(page.getByText('Branding saved.')).toBeVisible();
+});
+
+test('only an admin can add people', async ({ browser }) => {
+	const colleague = await browser.newContext();
+	const page = await colleague.newPage();
+	await page.goto('/players', { waitUntil: 'networkidle' });
+	await expect(page.getByText('Only an admin can add people')).toBeVisible();
+	await expect(page.getByPlaceholder('Add a person')).toHaveCount(0);
+	await colleague.close();
 });

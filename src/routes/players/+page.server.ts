@@ -1,12 +1,5 @@
 import * as v from 'valibot';
-import {
-	attempt,
-	formId,
-	formText,
-	readForm,
-	requireAdmin,
-	requireMember
-} from '$lib/server/forms';
+import { attempt, formId, formText, readForm, requireAdmin } from '$lib/server/forms';
 import {
 	addPlayer,
 	deletePlayer,
@@ -22,9 +15,9 @@ export const load: PageServerLoad = async () => ({ players: await listPlayers() 
 const name = formText(MAX_NAME_LENGTH + 20);
 
 export const actions: Actions = {
-	/** Anyone in the office can add themselves or a colleague. */
+	/** Only admins manage who is in the league, so nobody can grief the board. */
 	add: async ({ locals, request }) => {
-		requireMember(locals);
+		requireAdmin(locals);
 		return attempt(async () => {
 			const form = await readForm(request, v.object({ name }));
 			await addPlayer(form.name);
@@ -32,7 +25,6 @@ export const actions: Actions = {
 		});
 	},
 
-	/** Renaming, archiving and deleting are admin-only, so nobody can grief the board. */
 	rename: async ({ locals, request }) => {
 		requireAdmin(locals);
 		return attempt(async () => {
