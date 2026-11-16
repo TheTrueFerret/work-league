@@ -2,11 +2,20 @@ import { and, asc, count, desc, eq, inArray, sql, type SQL, type SQLWrapper } fr
 import type { BatchItem } from 'drizzle-orm/batch';
 import * as v from 'valibot';
 import { UserError } from '$lib/core/errors';
+import type { RatingRow } from '$lib/core/rating-table';
 import { computeDeltas, type Competitor } from '$lib/core/rating/elo';
 import { advanceStanding, blankStanding, type Standing } from '$lib/core/standing';
 import type { GameModule, MatchSubmission } from '$lib/modules/types';
 import { getDb, type Database } from '../db/client';
-import { gameVersions, matches, matchPlayers, players, ratings } from '../db/schema';
+import { cleanName } from './players';
+import {
+	gameVersions,
+	matches,
+	matchPlayers,
+	players,
+	ratings,
+	startingRatings
+} from '../db/schema';
 
 /** D1 accepts at most 100 bound parameters in one statement. */
 const MAX_PARAMS = 100;
@@ -248,6 +257,77 @@ export async function rebuildRatings(module: GameModule): Promise<void> {
 	});
 }
 
+async function startingRatingsFor(db: Database, moduleId: string): Promise<Map<number, number>> {
+	const rows = await db
+		.select({ playerId: startingRatings.playerId, rating: startingRatings.rating })
+		.from(startingRatings)
+		.where(eq(startingRatings.moduleId, moduleId));
+	return new Map(rows.map((r) => [r.playerId, r.rating]));
+}
+
+export interface RatingImport {
+	/** People whose starting rating was set. */
+	imported: number;
+	/** Of those, people who were not in the league yet and were added. */
+	added: number;
+}
+
+/**
+ * Sets each person's starting rating in one game, adding anyone not in the
+ * league yet, then replays the game so every result already recorded builds
+ * on the new starting points.
+ */
+export async function importRatings(
+	module: GameModule,
+	rows: readonly Pick<RatingRow, 'name' | 'rating'>[]
+): Promise<RatingImport> {
+	if (!rows.length) throw new UserError('There is nobody to import');
+	const clean = rows.map((r) => {
+		if (!Number.isSafeInteger(r.rating) || r.rating < 0)
+			throw new UserError(`${r.name} needs a whole-number rating`);
+		return { name: cleanName(r.name), rating: r.rating };
+	});
+	if (new Set(clean.map((r) => r.name.toLowerCase())).size !== clean.length)
+		throw new UserError('Someone is in the list twice');
+
+	const db = await getDb();
+	const idByName = async () =>
+		new Map(
+			(await db.select({ id: players.id, name: players.name }).from(players)).map((p) => [
+				p.name.toLowerCase(),
+				p.id
+			])
+		);
+
+	const known = await idByName();
+	const missing = clean.filter((r) => !known.has(r.name.toLowerCase()));
+	for (const batch of chunked(missing, MAX_PARAMS)) {
+		// Someone adding the same person at the same moment is fine: keep theirs.
+		await db
+			.insert(players)
+			.values(batch.map((r) => ({ name: r.name })))
+			.onConflictDoNothing();
+	}
+	const ids = missing.length ? await idByName() : known;
+	const starts = new Map(clean.map((r) => [ids.get(r.name.toLowerCase())!, r.rating]));
+
+	await retrying(async () => {
+		const version = await readVersion(db, module.id);
+		const replay = await planReplay(db, module, undefined, starts);
+		const writes = chunked([...starts], Math.floor(MAX_PARAMS / 3)).map((batch) =>
+			db
+				.insert(startingRatings)
+				.values(batch.map(([playerId, rating]) => ({ moduleId: module.id, playerId, rating })))
+				.onConflictDoUpdate({
+					target: [startingRatings.moduleId, startingRatings.playerId],
+					set: { rating: sql`excluded.rating` }
+				})
+		);
+		await db.batch([claimVersion(db, module.id, version), ...writes, ...replay] as Batch);
+	});
+	return { imported: clean.length, added: missing.length };
+}
+
 /** Rows per `update match_players` statement. The values are inlined integers, not parameters. */
 const UPDATE_ROWS = 1000;
 
@@ -264,8 +344,12 @@ const int = (n: number): number => {
 async function planReplay(
 	db: Database,
 	module: GameModule,
-	withoutMatch?: number
+	withoutMatch?: number,
+	newStarts?: ReadonlyMap<number, number>
 ): Promise<BatchItem<'sqlite'>[]> {
+	const starts = await startingRatingsFor(db, module.id);
+	for (const [playerId, rating] of newStarts ?? []) starts.set(playerId, rating);
+
 	const rows = await db
 		.select({
 			matchId: matchPlayers.matchId,
@@ -285,7 +369,10 @@ async function planReplay(
 		)
 		.then((all) => all.filter((r) => r.matchId !== withoutMatch));
 
-	const state = new Map<number, Standing>();
+	// Everyone with an imported rating is on the board before their first match.
+	const state = new Map<number, Standing>(
+		[...starts].map(([id, rating]) => [id, blankStanding(id, rating)])
+	);
 	const standingOf = (id: number): Standing =>
 		state.get(id) ?? blankStanding(id, module.rating.start);
 	const updates: { matchId: number; playerId: number; ratingBefore: number; delta: number }[] = [];
@@ -363,11 +450,13 @@ export interface LeaderboardRow {
 	streak: number;
 	form: string;
 	lastPlayed: Date | null;
+	/** On the ladder: has played, or was given a rating by an import. */
+	ranked: boolean;
 }
 
 /**
  * Everyone's standing in one game. Active players who have not played yet are
- * included at the starting rating; archived players only if they have played.
+ * included at the starting rating; archived players only if they are ranked.
  */
 export async function leaderboard(module: GameModule): Promise<LeaderboardRow[]> {
 	const db = await getDb();
@@ -401,12 +490,13 @@ export async function leaderboard(module: GameModule): Promise<LeaderboardRow[]>
 			peak: r.peak ?? start,
 			streak: r.streak ?? 0,
 			form: r.form ?? '',
-			lastPlayed: r.lastPlayed
+			lastPlayed: r.lastPlayed,
+			ranked: r.rating !== null
 		}))
-		.filter((r) => r.active || r.games > 0)
+		.filter((r) => r.active || r.ranked)
 		.sort(
 			(a, b) =>
-				Number(a.games === 0) - Number(b.games === 0) ||
+				Number(!a.ranked) - Number(!b.ranked) ||
 				b.rating - a.rating ||
 				b.wins - a.wins ||
 				a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
@@ -566,6 +656,12 @@ export async function playerGameProfile(module: GameModule, playerId: number) {
 		.where(mine)
 		.orderBy(asc(matches.playedAt), asc(matches.id));
 
+	const [imported] = await db
+		.select({ rating: startingRatings.rating })
+		.from(startingRatings)
+		.where(and(eq(startingRatings.moduleId, module.id), eq(startingRatings.playerId, playerId)));
+	const start = played[0]?.ratingBefore ?? imported?.rating ?? module.rating.start;
+
 	const everyone = await linesFor(
 		db
 			.select({ id: matchPlayers.matchId })
@@ -620,7 +716,7 @@ export async function playerGameProfile(module: GameModule, playerId: number) {
 		: [];
 
 	return {
-		curve: [module.rating.start, ...played.map((m) => m.ratingBefore + m.delta)],
+		curve: [start, ...played.map((m) => m.ratingBefore + m.delta)],
 		matches: played
 			.map((m) => ({
 				id: m.id,

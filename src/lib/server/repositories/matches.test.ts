@@ -7,13 +7,14 @@ import { freshDatabase } from '../testing/database';
 import {
 	deleteMatch,
 	history,
+	importRatings,
 	leaderboard,
 	playerGameProfile,
 	rebuildRatings,
 	recordMatch,
 	standingsFor
 } from './matches';
-import { addPlayer, deletePlayer, setPlayerActive } from './players';
+import { addPlayer, deletePlayer, listPlayers, setPlayerActive } from './players';
 
 const game = pool as GameModule;
 const find = (id: string) => (id === 'pool' ? game : undefined);
@@ -149,5 +150,91 @@ describe('recording matches', () => {
 		await expect(deletePlayer(ada)).rejects.toThrow(UserError);
 		await deletePlayer(ken);
 		expect((await leaderboard(game)).some((p) => p.id === ken)).toBe(false);
+	});
+});
+
+describe('importing ratings', () => {
+	beforeEach(async () => {
+		await freshDatabase();
+	});
+
+	it('adds new people and ranks them at their imported rating straight away', async () => {
+		const ada = await addPlayer('Ada');
+		const result = await importRatings(game, [
+			{ name: 'ada', rating: 1250 },
+			{ name: 'Linus', rating: 1100 },
+			{ name: 'Grace', rating: 900 }
+		]);
+		expect(result).toEqual({ imported: 3, added: 2 });
+		expect((await listPlayers()).map((p) => p.name)).toEqual(['Ada', 'Grace', 'Linus']);
+
+		const board = await leaderboard(game);
+		expect(board.map((p) => [p.name, p.rating, p.games, p.ranked])).toEqual([
+			['Ada', 1250, 0, true],
+			['Linus', 1100, 0, true],
+			['Grace', 900, 0, true]
+		]);
+		expect((await standingsFor(ada))[0]).toMatchObject({ rating: 1250, peak: 1250 });
+	});
+
+	it('rates new results from the imported ratings, and keeps them through replays', async () => {
+		await importRatings(game, [
+			{ name: 'Ada', rating: 1400 },
+			{ name: 'Linus', rating: 1000 }
+		]);
+		const [ada, linus] = (await leaderboard(game)).map((p) => p.id);
+		// The favourite wins, so gains far less than the 20 an even match pays.
+		const first = await win([ada!], [linus!]);
+		await win([linus!], [ada!]);
+		const afterTwo = await leaderboard(game);
+		expect(afterTwo.find((p) => p.id === ada)!.rating).toBeLessThan(1400);
+
+		await rebuildRatings(game);
+		expect(await leaderboard(game)).toEqual(afterTwo);
+
+		// Deleting the first match replays from the imported ratings, not from 1000.
+		await deleteMatch(first, find);
+		const [latest] = await history(game);
+		expect(latest!.sides.flatMap((s) => s.players.map((p) => [p.name, p.ratingBefore]))).toEqual([
+			['Linus', 1000],
+			['Ada', 1400]
+		]);
+		const profile = await playerGameProfile(game, ada!);
+		expect(profile.curve[0]).toBe(1400);
+	});
+
+	it('replays recorded results when ratings are imported later', async () => {
+		const ada = await addPlayer('Ada');
+		const linus = await addPlayer('Linus');
+		await win([ada], [linus]);
+		expect((await leaderboard(game))[0]).toMatchObject({ name: 'Ada', rating: 1020 });
+
+		await importRatings(game, [{ name: 'Ada', rating: 1500 }]);
+		const board = await leaderboard(game);
+		// Ada was the big favourite in that match all along, so she gains only a little.
+		expect(board.find((p) => p.id === ada)!.rating).toBeGreaterThan(1500);
+		expect(board.find((p) => p.id === ada)!.rating).toBeLessThan(1510);
+		expect(board.find((p) => p.id === linus)!.rating).toBeGreaterThan(990);
+
+		// Importing again replaces the earlier rating.
+		await importRatings(game, [{ name: 'Ada', rating: 1000 }]);
+		expect((await leaderboard(game)).find((p) => p.id === ada)!.rating).toBe(1020);
+	});
+
+	it('only touches the game it imports into', async () => {
+		await importRatings(game, [{ name: 'Ada', rating: 1300 }]);
+		const other = { ...game, id: 'darts' } as GameModule;
+		expect((await leaderboard(other))[0]).toMatchObject({ rating: 1000, ranked: false });
+	});
+
+	it('refuses lists it cannot trust', async () => {
+		await expect(importRatings(game, [])).rejects.toThrow(UserError);
+		await expect(
+			importRatings(game, [
+				{ name: 'Ada', rating: 1000 },
+				{ name: 'ADA', rating: 1100 }
+			])
+		).rejects.toThrow('twice');
+		await expect(importRatings(game, [{ name: '  ', rating: 1000 }])).rejects.toThrow(UserError);
 	});
 });

@@ -30,6 +30,8 @@ export interface GameScore {
 	readonly rating: number;
 	readonly games: number;
 	readonly played: boolean;
+	/** Has a rating in this game: played, or imported. */
+	readonly rated: boolean;
 }
 
 export interface ChampionshipEntry {
@@ -56,9 +58,10 @@ export function computeChampionship(
 				const played = !!s && s.games > 0;
 				return {
 					moduleId: game.id,
-					rating: played ? s.rating : game.rating.start,
+					rating: s ? s.rating : game.rating.start,
 					games: played ? s.games : 0,
-					played
+					played,
+					rated: !!s
 				};
 			});
 			const score = perGame.reduce((sum, g) => sum + g.rating, 0) / perGame.length;

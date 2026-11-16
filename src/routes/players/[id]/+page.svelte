@@ -28,7 +28,7 @@
 				<RankBadge
 					rating={standing?.rating ?? game.rating.start}
 					start={game.rating.start}
-					games={standing?.games ?? 0}
+					ranked={standing !== undefined}
 					size="md"
 				/>
 				<span>at {game.name.toLowerCase()}</span>

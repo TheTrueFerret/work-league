@@ -10,14 +10,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 	]);
 	return {
 		games: locals.games.map((g, i) => {
-			const leader = boards[i]?.find((p) => p.games > 0);
+			const leader = boards[i]?.find((p) => p.ranked);
 			return {
 				id: g.id,
 				matches: counts.get(g.id) ?? 0,
 				leader: leader ? { id: leader.id, name: leader.name, rating: leader.rating } : null
 			};
 		}),
-		podium: table.filter((e) => e.games > 0).slice(0, 3),
+		podium: table.filter((e) => e.perGame.some((g) => g.rated)).slice(0, 3),
 		people: table.length
 	};
 };

@@ -49,14 +49,22 @@
 						<td class="rank num">{i + 1}</td>
 						<th scope="row" class="player">
 							<a href="/players/{entry.playerId}">{entry.name}</a>
-							<RankBadge rating={entry.score} start={DEFAULT_START_RATING} games={entry.games} />
+							<RankBadge
+								rating={entry.score}
+								start={DEFAULT_START_RATING}
+								ranked={entry.perGame.some((g) => g.rated)}
+							/>
 						</th>
 						<td class="num score">{entry.score.toFixed(1)}</td>
 						{#each entry.perGame as g (g.moduleId)}
 							<td
 								class="num"
-								class:unplayed={!g.played}
-								title={g.played ? `${g.games} played` : 'Not played yet'}>{g.rating}</td
+								class:unplayed={!g.rated}
+								title={g.played
+									? `${g.games} played`
+									: g.rated
+										? 'Imported rating, not played yet'
+										: 'Not played yet'}>{g.rating}</td
 							>
 						{/each}
 					</tr>

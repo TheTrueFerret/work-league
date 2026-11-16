@@ -104,6 +104,23 @@ export const ratings = sqliteTable(
 );
 
 /**
+ * A rating a player starts a game on instead of the default, set by importing
+ * a table of names and ratings at /admin. Replays begin from it, so it survives
+ * deleted matches and rebuilds.
+ */
+export const startingRatings = sqliteTable(
+	'starting_ratings',
+	{
+		moduleId: text('module_id').notNull(),
+		playerId: integer('player_id')
+			.notNull()
+			.references(() => players.id, { onDelete: 'cascade' }),
+		rating: integer('rating').notNull()
+	},
+	(t) => [primaryKey({ columns: [t.moduleId, t.playerId] })]
+);
+
+/**
  * Bumped by every write to a game's ratings. D1 has no locks or interactive
  * transactions, so each write checks the version it started from and the
  * whole batch rolls back if another write got there first (see matches.ts).

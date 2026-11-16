@@ -1,6 +1,6 @@
 <!--
 	A player's rank (Bronze → Diamond) as a small metal-coloured badge.
-	Players with no games yet show as unranked.
+	Players with no rating yet (no matches, nothing imported) show as unranked.
 -->
 <script lang="ts">
 	import { rankFor } from '$lib/core/rating/ranks';
@@ -9,14 +9,14 @@
 		rating: number;
 		/** The game's starting rating; ranks are measured from it. */
 		start: number;
-		/** Matches played; zero shows "Unranked". */
-		games?: number;
+		/** False shows "Unranked": no matches played and no imported rating. */
+		ranked?: boolean;
 		size?: 'sm' | 'md' | 'lg';
 	}
 
-	let { rating, start, games = 1, size = 'sm' }: Props = $props();
+	let { rating, start, ranked = true, size = 'sm' }: Props = $props();
 
-	const rank = $derived(games > 0 ? rankFor(rating, start) : null);
+	const rank = $derived(ranked ? rankFor(rating, start) : null);
 </script>
 
 <span
