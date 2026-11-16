@@ -1,57 +1,200 @@
 <script lang="ts">
-	import { leagueModules } from '$lib/modules';
+	import { shell } from '$lib/shell';
+	import Icon from '$lib/components/Icon.svelte';
+	import { plural } from '$lib/core/format';
+	import { findModule } from '$lib/modules/registry';
+
+	let { data } = $props();
+
+	const cards = $derived(
+		data.games.flatMap((g) => {
+			const module = findModule(g.id);
+			return module ? [{ ...g, module }] : [];
+		})
+	);
+	const medal = ['🥇', '🥈', '🥉'];
 </script>
 
-<svelte:head>
-	<title>Work League</title>
-	<meta name="description" content="Friendly office competition, all in one league." />
-</svelte:head>
+<svelte:head><title>{shell().branding.name}</title></svelte:head>
 
 <header class="welcome">
-	<span class="eyebrow">Your office. Your games.</span>
-	<h1>Pick a league and get playing.</h1>
-	<p>Work League keeps every friendly rivalry in one place. Each game is an independent module, so the league can grow with your team.</p>
+	<h1>{shell().branding.name}</h1>
+	{#if shell().branding.tagline}<p>{shell().branding.tagline}</p>{/if}
 </header>
 
-<section aria-labelledby="modules-heading">
-	<div class="section-head">
-		<h2 id="modules-heading">Game modules</h2>
-		<span>{leagueModules.length} active</span>
-	</div>
-	<div class="module-grid">
-		{#each leagueModules as module (module.id)}
-			<a class="module-card" href={module.href} style:--module-accent={module.accent}>
-				<div class="module-icon" aria-hidden="true">8</div>
-				<div>
-					<h3>{module.name}</h3>
-					<p>{module.description}</p>
-				</div>
-				<span class="open">Open <span aria-hidden="true">→</span></span>
-			</a>
-		{/each}
-	</div>
+<section aria-labelledby="games-heading">
+	<h2 id="games-heading" class="section-label">Games</h2>
+	{#if cards.length}
+		<div class="games">
+			{#each cards as card (card.id)}
+				<a class="game" href="/{card.id}" style:--game="var(--game-{card.id})" style:--game-container="var(--game-{card.id}-container)" style:--game-on-container="var(--game-{card.id}-on-container)">
+					<span class="game-icon" aria-hidden="true"><Icon path={card.module.icon} size="1.6rem" /></span>
+					<span class="game-text">
+						<strong>{card.module.name}</strong>
+						<span class="muted">{card.module.description}</span>
+						<span class="meta">
+							<span>{plural(card.matches, 'match', 'matches')}</span>
+							{#if card.leader}<span>👑 {card.leader.name} · <span class="num">{card.leader.rating}</span></span>{/if}
+						</span>
+					</span>
+				</a>
+			{/each}
+		</div>
+	{:else}
+		<p class="card empty">No games are switched on. An admin can turn them on in Admin.</p>
+	{/if}
 </section>
 
-<aside class="extensible">
-	<strong>Built to expand.</strong>
-	<span>Darts, table football or your own game can join as another typed module.</span>
-</aside>
+<section aria-labelledby="champ-heading">
+	<div class="section-row">
+		<h2 id="champ-heading" class="section-label">Office championship</h2>
+		<a href="/championship">Full table →</a>
+	</div>
+	{#if data.podium.length}
+		<ol class="podium">
+			{#each data.podium as entry, i (entry.playerId)}
+				<li class="card">
+					<span class="medal" aria-hidden="true">{medal[i]}</span>
+					<a href="/players/{entry.playerId}">{entry.name}</a>
+					<span class="num score">{Math.round(entry.score)}</span>
+				</li>
+			{/each}
+		</ol>
+	{:else}
+		<p class="card empty">Everyone's on the table. Play any game to start climbing it.</p>
+	{/if}
+	<p class="muted small">{plural(data.people, 'person', 'people')} in the running, across {plural(cards.length, 'game')}.</p>
+</section>
 
 <style>
-	.welcome { padding: 3.5rem 0 2.75rem; max-width: 39rem; }
-	.eyebrow { color: var(--accent); font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-	.welcome h1 { margin-top: .55rem; font-size: clamp(2.4rem, 9vw, 4.25rem); line-height: .98; letter-spacing: -.055em; }
-	.welcome p { max-width: 34rem; margin: 1.25rem 0 0; color: var(--muted); font-size: 1.05rem; }
-	.section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: .8rem; }
-	.section-head span { color: var(--muted); font-size: .8rem; }
-	.module-grid { display: grid; gap: .8rem; }
-	.module-card { --module-accent: var(--accent); display: grid; grid-template-columns: auto 1fr auto; gap: 1rem; align-items: center; padding: 1.2rem; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 1.15rem; text-decoration: none; box-shadow: var(--shadow); transition: transform .18s, border-color .18s; }
-	.module-card:hover { transform: translateY(-2px); border-color: var(--module-accent); }
-	.module-icon { display: grid; place-items: center; width: 3.25rem; height: 3.25rem; color: #09230f; background: var(--module-accent); border-radius: 1rem; font-size: 1.3rem; font-weight: 850; }
-	.module-card h3 { margin-bottom: .25rem; font-size: 1.05rem; }
-	.module-card p { margin: 0; color: var(--muted); font-size: .85rem; }
-	.open { color: var(--module-accent); font-size: .85rem; font-weight: 700; }
-	.extensible { display: flex; gap: .45rem; margin-top: 1.25rem; padding: 1rem 1.1rem; color: var(--muted); background: var(--surface-2); border-radius: var(--r-lg); font-size: .83rem; }
-	.extensible strong { color: var(--text); }
-	@media (max-width: 32rem) { .welcome { padding-top: 2.4rem; } .module-card { grid-template-columns: auto 1fr; } .open { grid-column: 2; } .extensible { flex-direction: column; } }
+	.welcome {
+		padding: 2rem 0 0.5rem;
+	}
+
+	.welcome h1 {
+		font-size: clamp(2.2rem, 9vw, 3.6rem);
+		line-height: 1;
+		letter-spacing: -0.05em;
+	}
+
+	.welcome p {
+		margin: 0.75rem 0 0;
+		color: var(--muted);
+		font-size: 1.05rem;
+	}
+
+	.games {
+		display: grid;
+		gap: 0.7rem;
+	}
+
+	@media (min-width: 40rem) {
+		.games {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+
+	.game {
+		display: flex;
+		gap: 0.9rem;
+		align-items: flex-start;
+		padding: 1.1rem;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--r-xl);
+		box-shadow: var(--shadow);
+		text-decoration: none;
+		transition:
+			transform 0.18s,
+			border-color 0.18s;
+	}
+
+	.game:hover {
+		border-color: var(--game);
+		transform: translateY(-2px);
+	}
+
+	.game-icon {
+		display: grid;
+		flex: none;
+		place-items: center;
+		width: 3rem;
+		height: 3rem;
+		color: var(--game-on-container);
+		background: var(--game-container);
+		border-radius: 1rem;
+	}
+
+	.game-text {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		min-width: 0;
+	}
+
+	.game-text strong {
+		font-size: 1.05rem;
+	}
+
+	.game-text .muted {
+		font-size: 0.85rem;
+	}
+
+	.meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.3rem 0.8rem;
+		margin-top: 0.3rem;
+		color: var(--game);
+		font-size: 0.78rem;
+		font-weight: 600;
+	}
+
+	.section-row {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+	}
+
+	.section-row a {
+		color: var(--accent);
+		font-size: 0.85rem;
+		font-weight: 600;
+		text-decoration: none;
+	}
+
+	.podium {
+		display: grid;
+		gap: 0.5rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.podium li {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.75rem 1rem;
+	}
+
+	.podium a {
+		font-weight: 600;
+		text-decoration: none;
+	}
+
+	.medal {
+		font-size: 1.2rem;
+	}
+
+	.score {
+		margin-left: auto;
+		font-size: 1.1rem;
+		font-weight: 700;
+	}
+
+	.small {
+		margin-top: 0.6rem;
+		font-size: 0.8rem;
+	}
 </style>

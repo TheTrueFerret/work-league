@@ -1,31 +1,55 @@
-import { fail } from '@sveltejs/kit';
-import { addPlayer, deletePlayer, leaderboard, renamePlayer, setPlayerActive } from '$lib/modules/pool/server/repository';
+import * as v from 'valibot';
+import { attempt, formId, formText, readForm, requireAdmin, requireMember } from '$lib/server/forms';
+import {
+	addPlayer,
+	deletePlayer,
+	listPlayers,
+	MAX_NAME_LENGTH,
+	renamePlayer,
+	setPlayerActive
+} from '$lib/server/repositories/players';
+import type { Actions, PageServerLoad } from './$types';
 
-export async function load() {
-	return { players: await leaderboard() };
-}
+export const load: PageServerLoad = async () => ({ players: await listPlayers() });
 
-/**
- * Wraps an action so thrown validation errors become a 400 with a message.
- * @param {(form: FormData) => Promise<unknown>} fn
- * @returns {import('./$types').Action}
- */
-const guard = (fn) => async (event) => {
-	const form = await event.request.formData();
-	try {
-		await fn(form);
-		return { ok: true };
-	} catch (err) {
-		return fail(400, { error: /** @type {Error} */ (err).message });
+const name = formText(MAX_NAME_LENGTH + 20);
+
+export const actions: Actions = {
+	/** Anyone in the office can add themselves or a colleague. */
+	add: async ({ locals, request }) => {
+		requireMember(locals);
+		return attempt(async () => {
+			const form = await readForm(request, v.object({ name }));
+			await addPlayer(form.name);
+			return { added: true };
+		});
+	},
+
+	/** Renaming, archiving and deleting are admin-only, so nobody can grief the board. */
+	rename: async ({ locals, request }) => {
+		requireAdmin(locals);
+		return attempt(async () => {
+			const form = await readForm(request, v.object({ id: formId, name }));
+			await renamePlayer(form.id, form.name);
+			return { renamed: true };
+		});
+	},
+
+	archive: async ({ locals, request }) => {
+		requireAdmin(locals);
+		return attempt(async () => {
+			const form = await readForm(request, v.object({ id: formId, active: v.picklist(['0', '1']) }));
+			await setPlayerActive(form.id, form.active === '1');
+			return { archived: true };
+		});
+	},
+
+	delete: async ({ locals, request }) => {
+		requireAdmin(locals);
+		return attempt(async () => {
+			const form = await readForm(request, v.object({ id: formId }));
+			await deletePlayer(form.id);
+			return { deleted: true };
+		});
 	}
-};
-
-export const actions = {
-	add: guard((form) => addPlayer(String(form.get('name') ?? ''))),
-
-	rename: guard((form) => renamePlayer(Number(form.get('id')), String(form.get('name') ?? ''))),
-
-	archive: guard((form) => setPlayerActive(Number(form.get('id')), form.get('active') === '1')),
-
-	delete: guard((form) => deletePlayer(Number(form.get('id'))))
 };

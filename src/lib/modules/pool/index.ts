@@ -1,19 +1,39 @@
-import type { LeagueModule } from '../types';
+import * as v from 'valibot';
+import { defaultKFactor, DEFAULT_START_RATING } from '$lib/core/rating/elo';
+import { UserError } from '$lib/core/errors';
+import { defineModule } from '../types';
 
-export const poolModule = {
+export interface PoolDetails {
+	/** Index of the winning side. Absent on matches imported from Open Pottr. */
+	winner?: 0 | 1;
+}
+
+/**
+ * The original Work League game: any team size, one winner, nothing else to
+ * record. Everything interesting happens in the rating.
+ */
+export default defineModule<PoolDetails>({
 	id: 'pool',
-	name: 'Pool ladder',
-	description: 'Record team matches, track form and settle the office pool ranking.',
-	href: '/pool',
-	routePrefixes: ['/players'],
-	icon: 'ball',
+	name: 'Pool',
+	description: 'Singles or teams of any size. Record who won and watch the ladder move.',
 	accent: '#3dcd58',
-	navigation: [
-		{ href: '/pool', label: 'Ranks', icon: 'M4 20V10m6 10V4m6 16v-7' },
-		{ href: '/pool/new', label: 'Play', icon: 'M12 5v14M5 12h14' },
-		{ href: '/pool/history', label: 'History', icon: 'M12 8v4l3 2M3 12a9 9 0 1 0 2-5.6M3 4v3h3' },
-		{ href: '/players', label: 'People', icon: 'M16 20v-1a4 4 0 0 0-8 0v1M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7' }
-	]
-} as const satisfies LeagueModule;
-
-export { computeDeltas, expectedScore, kFactor, START_RATING, teamWinChance, tier } from './rating';
+	icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z',
+	format: { sides: { min: 2, max: 2 }, playersPerSide: { min: 1, max: 8 } },
+	rating: {
+		start: DEFAULT_START_RATING,
+		kFactor: defaultKFactor,
+		tiers: [
+			{ min: 1400, name: 'Shark' },
+			{ min: 1250, name: 'Hustler' },
+			{ min: 1100, name: 'Regular' },
+			{ min: 950, name: 'Casual' },
+			{ min: -Infinity, name: 'Rookie' }
+		]
+	},
+	details: v.object({ winner: v.optional(v.picklist([0, 1])) }),
+	resolve(details) {
+		if (details.winner === undefined) throw new UserError('Pick the winning side');
+		return details.winner === 0 ? [1, 2] : [2, 1];
+	},
+	Record: () => import('./Record.svelte')
+});

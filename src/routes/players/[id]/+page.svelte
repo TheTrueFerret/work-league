@@ -1,106 +1,142 @@
-<script>
-	import { tier } from '$lib/modules/pool';
+<script lang="ts">
+	import { shell } from '$lib/shell';
+	import RatingCurve from '$lib/components/RatingCurve.svelte';
+	import { percent, shortDate, signed } from '$lib/core/format';
+	import { tierFor } from '$lib/core/rating/elo';
+	import { findModule } from '$lib/modules/registry';
 
 	let { data } = $props();
 
-	const p = $derived(data.player);
-	const winRate = $derived(p.games ? Math.round((p.wins / p.games) * 100) : 0);
-
-	/** Rating curve as an SVG path, scaled to whatever range this player has seen. */
-	const curve = $derived.by(() => {
-		const pts = data.curve;
-		if (pts.length < 2) return null;
-
-		const lo = Math.min(...pts);
-		const hi = Math.max(...pts);
-		const span = Math.max(hi - lo, 40);
-		const mid = (hi + lo) / 2;
-		const top = mid + span / 2;
-
-		/** @param {number} i */
-		const x = (i) => (i / (pts.length - 1)) * 100;
-		/** @param {number} v */
-		const y = (v) => ((top - v) / span) * 100;
-
-		return {
-			line: pts.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(2)} ${y(v).toFixed(2)}`).join(' '),
-			area:
-				`M0 ${y(pts[0]).toFixed(2)} ` +
-				pts.map((v, i) => `L${x(i).toFixed(2)} ${y(v).toFixed(2)}`).join(' ') +
-				' L100 100 L0 100 Z',
-			lo,
-			hi
-		};
-	});
-
-	/** @param {number} n */
-	const sign = (n) => (n > 0 ? `+${n}` : `${n}`);
-
-	/** @param {Date} at */
-	const when = (at) =>
-		new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+	const games = $derived(shell().gameIds.map((id) => findModule(id)).filter((g) => g !== undefined));
+	const game = $derived(data.gameId ? findModule(data.gameId) : undefined);
+	const standing = $derived(data.standings.find((s) => s.moduleId === data.gameId));
+	const ordinal = (n: number) => (n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`);
 </script>
 
-<svelte:head><title>{p.name} · Work League</title></svelte:head>
+<svelte:head><title>{data.player.name} · {shell().branding.name}</title></svelte:head>
 
 <header class="page-head">
 	<div>
-		<h1>{p.name}</h1>
-		<p>{tier(p.rating)}{#if !p.active} · archived{/if}</p>
+		<h1>{data.player.name}</h1>
+		<p>
+			{#if game && standing}{tierFor(standing.rating, game.rating)} at {game.name.toLowerCase()}{:else}No matches yet{/if}{#if !data.player.active} · archived{/if}
+		</p>
 	</div>
-	<a class="btn btn-ghost" href="/">Back</a>
+	<a class="btn btn-ghost" href="/players">All people</a>
 </header>
 
-<div class="card hero">
-	<div class="stats">
-		<div><strong class="num big">{p.rating}</strong><span>rating</span></div>
-		<div><strong class="num">{p.wins}–{p.losses}</strong><span>W–L</span></div>
-		<div><strong class="num">{winRate}%</strong><span>win rate</span></div>
-		<div><strong class="num">{p.peak}</strong><span>peak</span></div>
-	</div>
-
-	{#if curve}
-		<svg class="curve" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Rating over time">
-			<path class="area" d={curve.area} />
-			<path class="line" d={curve.line} vector-effect="non-scaling-stroke" />
-		</svg>
-		<div class="axis num muted"><span>{curve.lo}</span><span>{curve.hi}</span></div>
-	{/if}
-</div>
-
-{#if data.opponents.length}
-	<h2 class="section">Head to head</h2>
-	<ul class="list">
-		{#each data.opponents as o (o.name)}
-			<li class="card row">
-				<span>{o.name}</span>
-				<span class="num">
-					<span class="delta up">{o.wins}</span> – <span class="delta down">{o.losses}</span>
-				</span>
-			</li>
+{#if games.length > 1}
+	<nav class="games" aria-label="Games">
+		{#each games as g (g.id)}
+			{@const s = data.standings.find((x) => x.moduleId === g.id)}
+			<a
+				href="?game={g.id}"
+				class:active={g.id === data.gameId}
+				aria-current={g.id === data.gameId ? 'page' : undefined}
+				data-sveltekit-noscroll
+				data-sveltekit-replacestate
+			>
+				{g.name}
+				<span class="num">{s?.rating ?? g.rating.start}</span>
+			</a>
 		{/each}
-	</ul>
+	</nav>
 {/if}
 
-{#if data.matches.length}
-	<h2 class="section">Matches</h2>
-	<ul class="list">
-		{#each data.matches as m (m.id)}
-			<li class="card row">
-				<span class="result" class:won={m.won}>{m.won ? 'Won' : 'Lost'}</span>
-				<span class="muted">{when(m.playedAt)}</span>
-				<span class="num end">
-					<span class="delta {m.delta >= 0 ? 'up' : 'down'}">{sign(m.delta)}</span>
-					<span class="muted">→ {m.ratingBefore + m.delta}</span>
-				</span>
-			</li>
-		{/each}
-	</ul>
-{:else}
-	<p class="empty">No matches yet.</p>
+{#if game && data.profile}
+	{@const s = standing}
+	<div class="card hero">
+		<div class="stats">
+			<div><strong class="num big">{s?.rating ?? game.rating.start}</strong><span>rating</span></div>
+			<div><strong class="num">{s?.wins ?? 0}–{s?.losses ?? 0}</strong><span>W–L</span></div>
+			<div><strong class="num">{percent(s?.wins ?? 0, s?.games ?? 0)}</strong><span>win rate</span></div>
+			<div><strong class="num">{s?.peak ?? game.rating.start}</strong><span>peak</span></div>
+		</div>
+		<RatingCurve points={data.profile.curve} />
+	</div>
+
+	{#if data.profile.stats.length}
+		<h2 class="section-label">{game.name} stats</h2>
+		<dl class="card extra">
+			{#each data.profile.stats as line (line.label)}
+				<div><dt>{line.label}</dt><dd class="num">{line.value}</dd></div>
+			{/each}
+		</dl>
+	{/if}
+
+	{#if data.profile.rivals.length}
+		<h2 class="section-label">Head to head</h2>
+		<ul class="stack tight">
+			{#each data.profile.rivals as rival (rival.id)}
+				<li class="card row">
+					<a href="/players/{rival.id}?game={game.id}">{rival.name}</a>
+					<span class="num end">
+						<span class="delta up">{rival.wins}</span> – <span class="delta down">{rival.losses}</span>
+					</span>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+
+	<h2 class="section-label">Matches</h2>
+	{#if data.profile.matches.length}
+		<ul class="stack tight">
+			{#each data.profile.matches as m (m.id)}
+				<li class="card row">
+					<span class="result" class:won={m.won}>{m.won ? 'Won' : m.placement > 2 ? ordinal(m.placement) : 'Lost'}</span>
+					<span class="vs">
+						{#if m.opponents.length}<span class="muted">vs</span> {m.opponents.join(', ')}{/if}
+						{#if m.summary}<span class="muted num"> · {m.summary}</span>{/if}
+					</span>
+					<span class="num end">
+						<span class="delta {m.delta >= 0 ? 'up' : 'down'}">{signed(m.delta)}</span>
+						<span class="muted when">{shortDate(m.playedAt)}</span>
+					</span>
+				</li>
+			{/each}
+		</ul>
+	{:else}
+		<p class="empty">No {game.name.toLowerCase()} matches yet.</p>
+	{/if}
 {/if}
 
 <style>
+	.games {
+		display: flex;
+		gap: 0.4rem;
+		margin-bottom: 1rem;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+
+	.games a {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		gap: 0.45rem;
+		padding: 0.45rem 0.85rem;
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		font-size: 0.85rem;
+		font-weight: 600;
+		text-decoration: none;
+	}
+
+	.games a span {
+		color: var(--muted);
+		font-weight: 500;
+	}
+
+	.games a.active {
+		color: var(--accent-on-soft);
+		background: var(--accent-soft);
+		border-color: transparent;
+	}
+
+	.games a.active span {
+		color: inherit;
+	}
+
 	.hero {
 		padding: 1.1rem 1.1rem 0.6rem;
 	}
@@ -124,60 +160,33 @@
 	}
 
 	.stats .big {
-		font-size: 1.6rem;
 		color: var(--accent);
+		font-size: 1.6rem;
 	}
 
-	.stats span {
+	.stats span,
+	dt {
+		color: var(--muted);
 		font-size: 0.7rem;
-		color: var(--muted);
-		text-transform: uppercase;
 		letter-spacing: 0.06em;
-	}
-
-	.curve {
-		display: block;
-		width: 100%;
-		height: 5.5rem;
-		margin-top: 1rem;
-		overflow: visible;
-	}
-
-	.curve .line {
-		fill: none;
-		stroke: var(--accent);
-		stroke-width: 2;
-		stroke-linejoin: round;
-		stroke-linecap: round;
-	}
-
-	.curve .area {
-		fill: var(--accent);
-		opacity: 0.12;
-		stroke: none;
-	}
-
-	.axis {
-		display: flex;
-		justify-content: space-between;
-		font-size: 0.68rem;
-	}
-
-	.section {
-		margin: 1.75rem 0 0.6rem;
-		color: var(--muted);
-		font-size: 0.8rem;
 		text-transform: uppercase;
-		letter-spacing: 0.08em;
 	}
 
-	.list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
+	.extra {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+		gap: 0.9rem;
 		margin: 0;
-		padding: 0;
-		list-style: none;
+	}
+
+	dd {
+		margin: 0.1rem 0 0;
+		font-size: 1.1rem;
+		font-weight: 700;
+	}
+
+	.tight {
+		gap: 0.4rem;
 	}
 
 	.row {
@@ -188,15 +197,33 @@
 		font-size: 0.9rem;
 	}
 
-	.row .end {
+	.row a {
+		text-decoration: none;
+	}
+
+	.vs {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.end {
 		display: flex;
-		gap: 0.4rem;
+		gap: 0.5rem;
 		margin-left: auto;
+		white-space: nowrap;
+	}
+
+	.when {
+		min-width: 3.2rem;
+		text-align: right;
 	}
 
 	.result {
-		font-weight: 600;
+		min-width: 2.6rem;
 		color: var(--loss);
+		font-weight: 600;
 	}
 
 	.result.won {

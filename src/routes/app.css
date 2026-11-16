@@ -1,70 +1,24 @@
 /*
- * Palette follows Schneider Electric's house style: neutral greys carrying a
- * single confident green, rather than a coloured background. Both schemes are
- * defined here and picked automatically from the OS setting.
+ * Colours are not defined here. The server generates them from the league's
+ * brand colour (see src/lib/theme/palette.ts) and writes them into every page
+ * as custom properties: --bg, --surface, --text, --accent, --side-0 … and so on.
+ * This file only holds shape, spacing and component styles.
  */
 
 :root {
-	/* Schneider Electric green, plus a darkened variant that stays legible as
-	   text on light backgrounds (the brand green alone is far too bright). */
-	--green: #3dcd58;
-	--green-deep: #1d8e33;
-	--green-dark: #14672a;
-
-	--team-a: #0a6ed1;
-	--team-b: #e07000;
-	/* Text laid directly on a team colour. */
-	--team-a-on: #ffffff;
-	--team-b-on: #241200;
-
 	--r-sm: 0.5rem;
 	--r-md: 0.75rem;
 	--r-lg: 1rem;
+	--r-xl: 1.4rem;
 
-	color-scheme: light dark;
-
-	/* Light — the default. */
-	--bg: #f4f5f6;
-	--surface: #ffffff;
-	--surface-2: #eceef0;
-	--border: #d9dcdf;
-	--text: #1a1a1a;
-	--muted: #61686e;
-
-	--accent: var(--green-deep);
-	--accent-fill: var(--green);
-	--accent-on-fill: #0b2e14;
-	--accent-soft: #3dcd581f;
-
-	--win: var(--green-deep);
-	--loss: #c8102e;
-
-	--shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+	--shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+	--shadow-raised: 0 6px 24px rgb(0 0 0 / 0.08);
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--bg: #16191c;
-		--surface: #1e2226;
-		--surface-2: #272c31;
-		--border: #333a40;
-		--text: #eceef0;
-		--muted: #9aa4ac;
-
-		--accent: var(--green);
-		--accent-fill: var(--green);
-		--accent-on-fill: #06210d;
-		--accent-soft: #3dcd5824;
-
-		--win: var(--green);
-		--loss: #ff6b7a;
-
-		--team-a: #4da3f0;
-		--team-b: #ffa040;
-		--team-a-on: #06192b;
-		--team-b-on: #241200;
-
 		--shadow: none;
+		--shadow-raised: 0 6px 24px rgb(0 0 0 / 0.4);
 	}
 }
 
@@ -147,6 +101,8 @@ textarea {
 
 input[type='text'],
 input[type='password'],
+input[type='number'],
+select,
 textarea {
 	width: 100%;
 	padding: 0.7rem 0.85rem;
@@ -201,8 +157,19 @@ input::placeholder {
 }
 
 .btn-primary:hover:not(:disabled) {
-	background: color-mix(in oklab, var(--accent-fill) 88%, black);
-	border-color: color-mix(in oklab, var(--accent-fill) 88%, black);
+	background: color-mix(in oklab, var(--accent-fill) 88%, var(--text));
+	border-color: color-mix(in oklab, var(--accent-fill) 88%, var(--text));
+}
+
+.btn-tonal {
+	background: var(--accent-soft);
+	border-color: transparent;
+	color: var(--accent-on-soft);
+}
+
+.btn-tonal:hover:not(:disabled) {
+	background: color-mix(in oklab, var(--accent-soft) 85%, var(--accent));
+	border-color: transparent;
 }
 
 .btn-ghost {
@@ -276,4 +243,40 @@ input::placeholder {
 		animation-duration: 0.01ms !important;
 		transition-duration: 0.01ms !important;
 	}
+}
+
+.section-label {
+	margin: 1.75rem 0 0.6rem;
+	color: var(--muted);
+	font-size: 0.8rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+
+.stack {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.notice {
+	margin-bottom: 1rem;
+	padding: 0.7rem 0.9rem;
+	background: var(--secondary-soft);
+	color: var(--secondary-on-soft);
+	border-radius: var(--r-md);
+	font-size: 0.9rem;
+}
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
 }

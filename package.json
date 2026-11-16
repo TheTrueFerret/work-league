@@ -21,6 +21,8 @@
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {
+		"@eslint/js": "^10.0.1",
+		"@playwright/test": "^1.65.1",
 		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/adapter-cloudflare": "^7.2.9",
 		"@sveltejs/adapter-node": "^5.5.7",
@@ -28,15 +30,27 @@
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@types/node": "^26.2.0",
 		"drizzle-kit": "^0.31.10",
+		"eslint": "^10.15.0",
+		"eslint-config-prettier": "^10.1.8",
+		"eslint-plugin-svelte": "^3.24.1",
+		"globals": "^17.14.0",
+		"prettier": "^3.10.1",
+		"prettier-plugin-svelte": "^4.1.1",
 		"svelte": "^5.56.1",
 		"svelte-check": "^4.6.0",
+		"tsx": "^4.23.15",
 		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.72.2",
 		"vite": "^8.0.16",
+		"vitest": "^4.1.12",
 		"wrangler": "^4.125.0"
 	},
 	"description": "Modular leagues for friendly competition at work.",
 	"dependencies": {
+		"@electric-sql/pglite": "^0.5.16",
+		"@material/material-color-utilities": "^0.4.0",
 		"drizzle-orm": "^0.45.2",
-		"postgres": "^3.4.9"
+		"postgres": "^3.4.9",
+		"valibot": "^1.5.0"
 	}
 }
