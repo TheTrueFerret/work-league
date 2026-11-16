@@ -114,8 +114,17 @@ export async function saveSetting<K extends Exclude<Key, 'secret'>>(
  * otherwise one is generated on first use and kept in the database, so a
  * fresh install needs no extra configuration.
  */
+let storedSecret: string | undefined;
+
 export async function sessionSecret(fromEnv: string | undefined): Promise<string> {
 	if (fromEnv && fromEnv.length >= 16) return fromEnv;
+	// It never changes once created, so read it once per server instance.
+	if (storedSecret) return storedSecret;
+	storedSecret = await loadOrCreateSecret();
+	return storedSecret;
+}
+
+async function loadOrCreateSecret(): Promise<string> {
 	const db = await getDb();
 	const [row] = await db.select().from(settings).where(eq(settings.key, 'secret'));
 	const existing = row && v.safeParse(SecretSchema, row.value);
@@ -135,4 +144,5 @@ export async function sessionSecret(fromEnv: string | undefined): Promise<string
 /** Forget the cached copy, for tests. */
 export function clearSettingsCache(): void {
 	cached = undefined;
+	storedSecret = undefined;
 }

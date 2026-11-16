@@ -49,7 +49,7 @@
 			maxlength="40"
 			required
 		/>
-		<button class="btn btn-primary" disabled={!name.trim()}>Add</button>
+		<button class="btn btn-primary">Add</button>
 	</form>
 {/if}
 

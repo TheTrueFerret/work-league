@@ -16,3 +16,5 @@ export class PGlite {
 }
 
 export const drizzle = unavailable;
+
+export const migrate = unavailable;

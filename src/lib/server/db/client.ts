@@ -68,11 +68,14 @@ function openPglite(url: string): Promise<Connection> {
 			import('@electric-sql/pglite'),
 			import('drizzle-orm/pglite')
 		]);
-		const path = url.slice('pglite:'.length);
+		// `pglite:<path>[?migrations=off]`; tests turn migrations off to build old schemas by hand.
+		const [path = '', query = ''] = url.slice('pglite:'.length).split('?');
 		const client = path === 'memory' || path === '' ? new PGlite() : new PGlite(path);
 		await client.waitReady;
+		const db = drizzle(client, { schema });
+		if (!new URLSearchParams(query).has('migrations', 'off')) await migrateEmbedded(db);
 		return {
-			db: drizzle(client, { schema }) as unknown as Database,
+			db: db as unknown as Database,
 			close: async () => {
 				embedded.delete(url);
 				await client.close();
@@ -81,6 +84,24 @@ function openPglite(url: string): Promise<Connection> {
 	})();
 	embedded.set(url, connecting);
 	return connecting;
+}
+
+/**
+ * An embedded database belongs to this one process, so it is safe to bring
+ * its schema up to date on open: `npm run dev`, tests and the single-container
+ * Docker image need no separate migrate step. Shared PostgreSQL servers are
+ * migrated explicitly with `npm run db:migrate` instead.
+ */
+async function migrateEmbedded(
+	db: Parameters<typeof import('drizzle-orm/pglite/migrator').migrate>[0]
+) {
+	const [{ existsSync }, { resolve }, { migrate }] = await Promise.all([
+		import('node:fs'),
+		import('node:path'),
+		import('drizzle-orm/pglite/migrator')
+	]);
+	const migrationsFolder = resolve(process.cwd(), 'drizzle');
+	if (existsSync(migrationsFolder)) await migrate(db, { migrationsFolder });
 }
 
 /* -------------------------------------------------------------------------- */

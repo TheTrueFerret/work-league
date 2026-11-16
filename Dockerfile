@@ -16,7 +16,9 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
 COPY --from=build /app/drizzle ./drizzle
 COPY --from=build /app/scripts/migrate.ts ./scripts/migrate.ts
-# Used by the embedded database when DATABASE_URL is a pglite: path.
+# The embedded database lives here when DATABASE_URL is a pglite: path. A named
+# volume mounted here inherits this ownership, so the node user can write to it.
+RUN mkdir -p /data && chown node:node /data
 VOLUME /data
 EXPOSE 3000
 USER node

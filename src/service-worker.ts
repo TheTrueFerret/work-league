@@ -8,7 +8,12 @@ const CACHE = `work-league-${version}`;
 const SHELL = [...build, ...files];
 
 self.addEventListener('install', (event) => {
-	event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
+	event.waitUntil(
+		caches
+			.open(CACHE)
+			.then((cache) => cache.addAll(SHELL))
+			.then(() => self.skipWaiting())
+	);
 });
 
 self.addEventListener('activate', (event) => {
@@ -29,8 +34,6 @@ self.addEventListener('fetch', (event) => {
 
 	// Hashed build assets never change under the same URL.
 	if (SHELL.includes(url.pathname)) {
-		event.respondWith(
-			caches.match(request).then((hit) => hit ?? fetch(request))
-		);
+		event.respondWith(caches.match(request).then((hit) => hit ?? fetch(request)));
 	}
 });

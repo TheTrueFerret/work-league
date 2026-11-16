@@ -21,7 +21,7 @@ const MIGRATIONS = ['0000_init.sql', '0001_game_modules.sql'];
  */
 export async function freshDatabase(until?: string) {
 	await closeDatabase();
-	configureDatabase(`pglite:memory`);
+	configureDatabase('pglite:memory?migrations=off');
 	const db = await getDb();
 	for (const file of MIGRATIONS) {
 		if (file === until) break;

@@ -168,7 +168,7 @@
 	<div class="tools">
 		{#if mode === 'teams' && sideCount === 2}
 			<button type="button" class="btn btn-ghost" onclick={balance} disabled={taken.size < 2}
-				>Balance teams</button
+				>Balance</button
 			>
 			<button type="button" class="btn btn-ghost" onclick={swap} disabled={!ready}
 				>Swap sides</button

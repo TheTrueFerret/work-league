@@ -271,6 +271,15 @@
 	{/if}
 </section>
 
+<!-- Data --------------------------------------------------------------- -->
+<section class="card block" aria-labelledby="data-heading">
+	<h2 id="data-heading">Data</h2>
+	<p class="muted">
+		Download every person and match as JSON, for backups or moving to another server.
+	</p>
+	<a class="btn btn-tonal" href="/admin/export" download data-sveltekit-reload>Download export</a>
+</section>
+
 <style>
 	.block {
 		display: flex;
@@ -506,6 +515,10 @@
 
 	.notice {
 		margin: 0;
+	}
+
+	.block > .btn {
+		align-self: flex-start;
 	}
 
 	@media (max-width: 30rem) {

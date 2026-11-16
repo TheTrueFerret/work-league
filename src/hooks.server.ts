@@ -5,6 +5,7 @@ import { ADMIN_COOKIE, isValidAdmin, isValidMember, MEMBER_COOKIE } from '$lib/s
 import {
 	configureDatabase,
 	DatabaseNotConfiguredError,
+	isPglite,
 	withRequestConnection
 } from '$lib/server/db/client';
 import { readEnv } from '$lib/server/env';
@@ -18,23 +19,26 @@ const PUBLIC_PREFIXES = ['/brand/'];
 const isPublic = (path: string) =>
 	PUBLIC_PATHS.includes(path) || PUBLIC_PREFIXES.some((prefix) => path.startsWith(prefix));
 
+/** True only inside the real Workers runtime, not under `vite dev`'s Cloudflare emulation. */
+const onWorkers = globalThis.navigator?.userAgent === 'Cloudflare-Workers';
+
 /**
  * Cloudflare Workers get a connection per request (a socket may not outlive
- * it); Node keeps one shared pool and only needs the URL.
+ * it); Node keeps one shared pool and only needs the URL. An embedded PGlite
+ * database is always shared: reopening it per request would lose its data.
  */
 const database: Handle = async ({ event, resolve }) => {
 	event.locals.env = readEnv(event);
 	const url = event.locals.env.databaseUrl;
-	const platform = event.platform;
 
-	if (!platform?.env) {
+	if (!onWorkers || (url && isPglite(url))) {
 		configureDatabase(url);
 		return resolve(event);
 	}
 	return withRequestConnection(
 		url,
 		async () => resolve(event),
-		(promise) => platform.context?.waitUntil(promise)
+		(promise) => event.platform?.context?.waitUntil(promise)
 	);
 };
 
