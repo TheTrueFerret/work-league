@@ -86,7 +86,10 @@ hosted libSQL database such as [Turso](https://turso.tech) (`libsql://…?authTo
 1. Tap **Admin** in the top bar (or open `/admin`) and sign in with `ADMIN_PASSWORD`. Anyone you
    give it to is an admin too.
 2. **Branding:** set the league name and tagline, upload a square logo and pick a colour, or tap
-   one of the colours taken from your logo. The preview shows light and dark.
+   one of the colours taken from your logo. The preview shows light and dark. The admin screen
+   also draws the picture chat apps show when someone pastes a league link (Slack, Teams,
+   WhatsApp, Discord): your logo, name and tagline on your colour, signed Work League. It
+   redraws by itself whenever you save the branding or logo.
 3. **Games:** switch off any games your office doesn't play.
 4. **Access:** set the office passphrase and share it with colleagues. Until you set one, anyone
    with the link can record results. Turn on **public rankings** if you want a read-only view for

@@ -89,7 +89,7 @@ export const actions: Actions = {
 			assets.set(key, decodePng(value));
 		}
 		await saveBrandAssets(assets);
-		const current = await loadSettings();
+		const current = await loadSettings({ fresh: true });
 		await saveSetting('branding', { ...current.branding, logoVersion: Date.now() });
 		return { saved: 'logo' };
 	}),

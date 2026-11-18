@@ -21,7 +21,12 @@ const BrandingSchema = v.object({
 	),
 	seed: v.optional(hexColour, DEFAULT_SEED),
 	/** Bumped on every logo upload so browsers fetch the new one. Null means no logo. */
-	logoVersion: v.optional(v.nullable(v.number()), null)
+	logoVersion: v.optional(v.nullable(v.number()), null),
+	/**
+	 * The link-preview picture drawn from the branding above: `key` is what it
+	 * shows (see shareCardKey), `version` when it was saved. Null: none yet.
+	 */
+	shareCard: v.optional(v.nullable(v.object({ key: v.string(), version: v.number() })), null)
 });
 
 const ModulesSchema = v.object({
@@ -76,8 +81,9 @@ const lenient = <S extends v.GenericSchema>(schema: S, raw: unknown): v.InferOut
 	return parsed.success ? parsed.output : v.parse(schema, {});
 };
 
-export async function loadSettings(): Promise<Settings> {
-	if (cached && Date.now() - cached.at < TTL_MS) return cached.value;
+/** `fresh` skips this instance's copy: for read-modify-write, where a stale copy would undo a save. */
+export async function loadSettings({ fresh = false } = {}): Promise<Settings> {
+	if (!fresh && cached && Date.now() - cached.at < TTL_MS) return cached.value;
 	const db = await getDb();
 	const rows = await db
 		.select()

@@ -7,6 +7,7 @@
 	import { buildPalette, DEFAULT_SEED, isHexColour } from '$lib/theme/palette';
 	import { extractColours, fitCrop, loadImage, renderIcons, type Crop } from '$lib/theme/logo';
 	import LogoCropper from '$lib/components/LogoCropper.svelte';
+	import { renderShareCard, shareCardKey, shareCardLogoUrl } from '$lib/theme/share-card';
 
 	let { data, form } = $props();
 
@@ -70,6 +71,48 @@
 		// Re-render the icon backgrounds in the new colour.
 		if (image && crop) logoIcons = renderIcons(image, iconBackground, crop);
 	}
+
+	/**
+	 * The link-preview card is drawn here, in the browser, from the saved
+	 * branding. Whenever what it would show differs from the stored card, it
+	 * is redrawn and sent, so saving the name, colour or logo is enough.
+	 */
+	let shareCardTried = '';
+
+	async function refreshShareCard(branding: typeof data.settings.branding, key: string) {
+		try {
+			const [logo, mark] = await Promise.all([
+				loadImage(shareCardLogoUrl(branding.logoVersion)),
+				loadImage('/icons/icon-192.png')
+			]);
+			const card = await renderShareCard({
+				name: branding.name,
+				tagline: branding.tagline,
+				seed: branding.seed,
+				logo,
+				customLogo: Boolean(branding.logoVersion),
+				mark
+			});
+			const body = new FormData();
+			body.set('card', card, 'share-card.jpg');
+			body.set('key', key);
+			const response = await fetch('/admin/share-card', { method: 'POST', body });
+			if (!response.ok) throw new Error(`Saving the share card failed (${response.status})`);
+			await invalidateAll();
+		} catch (err) {
+			// Chat apps keep showing the previous card; the next visit tries again.
+			console.error(err);
+		}
+	}
+
+	$effect(() => {
+		const branding = data.settings.branding;
+		const key = shareCardKey(branding);
+		// Try each version of the branding once, so a failure can't loop.
+		if (branding.shareCard?.key === key || shareCardTried === key) return;
+		shareCardTried = key;
+		void refreshShareCard(branding, key);
+	});
 
 	const saved = $derived(form && 'saved' in form ? form.saved : null);
 	const refresh =
