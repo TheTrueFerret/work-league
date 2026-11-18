@@ -18,7 +18,21 @@ export const isBrandAssetKey = (key: string): key is BrandAssetKey => key in BRA
 /** Largest PNG accepted per icon. The browser resizes before uploading, so this is generous. */
 export const MAX_ASSET_BYTES = 400_000;
 
-export async function getBrandAsset(key: BrandAssetKey) {
+/** The link-preview picture. Kept apart from the icons: it is redrawn on its own. */
+export const SHARE_CARD = {
+	key: 'share-card.jpg',
+	contentType: 'image/jpeg',
+	fallback: '/icons/share-card.jpg',
+	maxBytes: 600_000
+} as const;
+
+/** Every file /brand/ serves, with the built-in one to fall back to. */
+export const BRAND_FILES: Record<string, { fallback: string }> = {
+	...BRAND_ASSETS,
+	[SHARE_CARD.key]: SHARE_CARD
+};
+
+export async function getBrandAsset(key: string) {
 	const db = await getDb();
 	const [row] = await db.select().from(brandAssets).where(eq(brandAssets.key, key));
 	return row ?? null;
@@ -43,4 +57,13 @@ export async function saveBrandAssets(
 export async function clearBrandAssets(): Promise<void> {
 	const db = await getDb();
 	await db.delete(brandAssets).where(inArray(brandAssets.key, Object.keys(BRAND_ASSETS)));
+}
+
+export async function saveShareCard(bytes: Uint8Array): Promise<void> {
+	const db = await getDb();
+	const data = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+	await db
+		.insert(brandAssets)
+		.values({ key: SHARE_CARD.key, contentType: SHARE_CARD.contentType, data })
+		.onConflictDoUpdate({ target: brandAssets.key, set: { data, updatedAt: new Date() } });
 }

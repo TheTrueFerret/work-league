@@ -100,6 +100,19 @@ test('branding keeps what was typed, and a logo can be cropped before upload', a
 	await expect(page.getByLabel('League name')).toHaveValue('Crop League');
 	await expect(page.getByLabel('Brand colour hex')).toHaveValue('#e05a2b');
 
+	// The link-preview card redraws itself and chat apps are pointed at it.
+	const ogImage = async () => {
+		const head = await (await page.request.get('/')).text();
+		if (!head.includes('<meta property="og:title" content="Crop League" />')) return null;
+		return (
+			head.match(/property="og:image" content="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&') ?? null
+		);
+	};
+	await expect.poll(ogImage).toMatch(/\/brand\/share-card\.jpg\?v=[1-9]\d+$/);
+	const image = await ogImage();
+	const card = await page.request.get(image!);
+	expect(card.headers()['content-type']).toBe('image/jpeg');
+
 	// A wide logo with its mark off to one side: zoom in before uploading.
 	await page.locator('input[type=file][accept^="image"]').setInputFiles({
 		name: 'logo.svg',

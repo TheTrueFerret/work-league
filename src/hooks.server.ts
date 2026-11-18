@@ -6,6 +6,7 @@ import { configureDatabase, DatabaseNotConfiguredError, withD1 } from '$lib/serv
 import { readEnv } from '$lib/server/env';
 import { loadSettings, sessionSecret } from '$lib/server/repositories/settings';
 import { themeFor } from '$lib/server/theme';
+import { DEFAULT_TAGLINE } from '$lib/theme/share-card';
 
 /** Reachable without the office passphrase. */
 const PUBLIC_PATHS = ['/unlock', '/admin/login', '/manifest.webmanifest'];
@@ -68,16 +69,26 @@ const access: Handle = async ({ event, resolve }) => {
 
 const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-/** Writes the brand colours and name into the HTML so the first paint is already themed. */
+/**
+ * Writes the brand colours and name into the HTML so the first paint is
+ * already themed, and so link previews in chat apps show the league.
+ */
 const theme: Handle = ({ event, resolve }) => {
 	const { branding } = event.locals.settings;
 	const rendered = themeFor(branding.seed, event.locals.games);
+	const description = branding.tagline || DEFAULT_TAGLINE;
+	// Chat apps need an absolute URL; the version makes them fetch a redrawn card.
+	const shareImage = new URL(
+		`/brand/share-card.jpg?v=${branding.shareCard?.version ?? 0}`,
+		event.url.origin
+	).href;
 	return resolve(event, {
 		transformPageChunk: ({ html }) =>
 			html
 				.replace('%wl.theme%', rendered.css)
 				.replaceAll('%wl.name%', escapeHtml(branding.name))
-				.replace('%wl.description%', escapeHtml(branding.tagline))
+				.replaceAll('%wl.description%', escapeHtml(description))
+				.replace('%wl.shareImage%', escapeHtml(shareImage))
 				.replace('%wl.themeLight%', rendered.palette.light['--theme-color'] ?? '#ffffff')
 				.replace('%wl.themeDark%', rendered.palette.dark['--theme-color'] ?? '#000000')
 				.replaceAll('%wl.assetVersion%', String(branding.logoVersion ?? 0))
